@@ -4,6 +4,44 @@
 
 body {
   margin: 0;
-  background: #f8fafc;
-  color: #0f172a;
+  background: #f6f8fb;
+  color: #111827;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html.dark body {
+  background: #101828;
+  color: #f8fafc;
+}
+
+@layer components {
+  .app-surface {
+    @apply border border-slate-200 bg-white shadow-sm dark:border-slate-700/70 dark:bg-slate-800/80 dark:shadow-none;
+  }
+
+  .app-surface-subtle {
+    @apply border border-slate-100 bg-slate-50 dark:border-slate-700/70 dark:bg-slate-900/40;
+  }
+
+  .app-muted {
+    @apply text-slate-500 dark:text-slate-300;
+  }
+
+  .app-muted-strong {
+    @apply text-slate-700 dark:text-slate-200;
+  }
+
+  .app-heading {
+    @apply text-slate-950 dark:text-slate-50;
+  }
+
+  .app-button-secondary {
+    @apply border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 dark:hover:bg-slate-800;
+  }
 }
