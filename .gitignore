@@ -9,6 +9,7 @@ __pycache__
 .pytest_cache
 .env
 *.pyc
+*.egg-info
 data/postgres/runtime
 data/clickhouse/runtime
 data/qdrant/runtime
