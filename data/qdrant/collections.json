@@ -1,0 +1,50 @@
+{
+  "qdrant_config": {
+    "default_vector_params": {
+      "size": 1536,
+      "distance": "Cosine",
+      "hnsw_config": {
+        "m": 16,
+        "ef_construct": 100
+      }
+    },
+    "collections": [
+      {
+        "name": "product_docs",
+        "description": "Product Requirements Documents and functional specifications"
+      },
+      {
+        "name": "architecture_docs",
+        "description": "High Level Design (HLD) and Low Level Design (LLD) assets"
+      },
+      {
+        "name": "engineering_docs",
+        "description": "Codebase annotations, API mappings, and package interfaces"
+      },
+      {
+        "name": "support_kb",
+        "description": "Customer support transcripts and vehicle lookup FAQs"
+      },
+      {
+        "name": "legal_docs",
+        "description": "Compliance protocols, insurance guidelines, and Indian motor vehicle acts"
+      },
+      {
+        "name": "design_system",
+        "description": "Component definitions, UI guidelines, and token systems"
+      },
+      {
+        "name": "historical_implementations",
+        "description": "Past PRs, successful implementations, and codebase samples"
+      },
+      {
+        "name": "incident_summaries",
+        "description": "Past system anomalies, RCA outcomes, and postmortems"
+      },
+      {
+        "name": "analytics_insights",
+        "description": "Agent optimization scores, cost trends, and prediction histories"
+      }
+    ]
+  }
+}

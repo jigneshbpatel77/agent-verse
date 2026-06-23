@@ -1,0 +1,26 @@
+{
+  "name": "agent-verse-monorepo",
+  "version": "1.0.0",
+  "description": "Scalable AI Agent Company Platform for Vehicle Information Platform in India",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev:gateway": "pnpm --filter @apps/api-gateway start:dev",
+    "dev:orchestrator": "pnpm --filter @apps/orchestrator-service start:dev",
+    "dev:console": "pnpm --filter @apps/web-console dev",
+    "dev:agents": "turbo run start:dev --filter=\"@agents/*\"",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.4",
+    "typescript": "^5.1.3",
+    "prettier": "^3.0.0",
+    "eslint": "^8.42.0"
+  }
+}

@@ -1,0 +1,51 @@
+# Node.js
+node_modules/
+dist/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.turbo/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.poetry/
+.venv/
+poetry.lock
+venv/
+ENV/
+env/
+.ipynb_checkpoints/
+alembic.log
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Databases & local state
+data/postgres_data/
+data/redis_data/
+data/clickhouse_data/
+data/qdrant_data/
+data/temporal_data/
+
+# IDE / Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

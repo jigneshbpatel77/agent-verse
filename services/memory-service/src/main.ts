@@ -1,0 +1,1 @@
+// Microservice entry point for memory-service

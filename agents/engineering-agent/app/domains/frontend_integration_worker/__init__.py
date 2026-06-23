@@ -1,0 +1,1 @@
+# Specialized worker: frontend_integration_worker
