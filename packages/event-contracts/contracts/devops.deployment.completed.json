@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "devops.deployment.completed",
+  "type": "object",
+  "required": [
+    "eventId",
+    "topic",
+    "tenantId",
+    "aggregateId",
+    "payload",
+    "occurredAt",
+    "schemaVersion"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string"
+    },
+    "topic": {
+      "const": "devops.deployment.completed"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "aggregateId": {
+      "type": "string"
+    },
+    "correlationId": {
+      "type": "string"
+    },
+    "causationId": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object"
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "additionalProperties": false
+}

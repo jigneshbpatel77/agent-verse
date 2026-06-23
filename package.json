@@ -1,0 +1,21 @@
+{
+  "name": "ai-agent-platform",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "dev:gateway": "pnpm --filter @agent-platform/api-gateway dev",
+    "dev:web": "pnpm --filter @agent-platform/web-console dev",
+    "dev:orchestrator": "pnpm --filter @agent-platform/orchestrator-service dev"
+  },
+  "devDependencies": {
+    "@nx/js": "^20.0.0",
+    "nx": "^20.0.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.0"
+  }
+}

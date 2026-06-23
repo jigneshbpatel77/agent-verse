@@ -1,0 +1,14 @@
+node_modules
+.next
+dist
+coverage
+.turbo
+.nx
+.venv
+__pycache__
+.pytest_cache
+.env
+*.pyc
+data/postgres/runtime
+data/clickhouse/runtime
+data/qdrant/runtime

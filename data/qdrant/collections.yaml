@@ -1,0 +1,64 @@
+collections:
+  - name: product_docs
+    vectors:
+      size: 1536
+      distance: Cosine
+    payload_indexes:
+      - tenant_id
+      - document_type
+  - name: architecture_docs
+    vectors:
+      size: 1536
+      distance: Cosine
+    payload_indexes:
+      - tenant_id
+      - document_type
+  - name: engineering_docs
+    vectors:
+      size: 1536
+      distance: Cosine
+    payload_indexes:
+      - tenant_id
+      - document_type
+  - name: support_kb
+    vectors:
+      size: 1536
+      distance: Cosine
+    payload_indexes:
+      - tenant_id
+      - document_type
+  - name: legal_docs
+    vectors:
+      size: 1536
+      distance: Cosine
+    payload_indexes:
+      - tenant_id
+      - document_type
+  - name: design_system
+    vectors:
+      size: 1536
+      distance: Cosine
+    payload_indexes:
+      - tenant_id
+      - document_type
+  - name: historical_implementations
+    vectors:
+      size: 1536
+      distance: Cosine
+    payload_indexes:
+      - tenant_id
+      - document_type
+  - name: incident_summaries
+    vectors:
+      size: 1536
+      distance: Cosine
+    payload_indexes:
+      - tenant_id
+      - document_type
+  - name: analytics_insights
+    vectors:
+      size: 1536
+      distance: Cosine
+    payload_indexes:
+      - tenant_id
+      - document_type
