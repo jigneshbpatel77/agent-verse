@@ -29,6 +29,32 @@ docker compose up -d
 pnpm dev
 ```
 
+Open the web console at `http://localhost:3000`.
+
+If Docker fails to pull Kafka with `bitnami/kafka:3.8: not found`, use the legacy Bitnami image:
+
+```bash
+perl -0pi -e 's#bitnami/kafka:3\.8#bitnamilegacy/kafka:3.8#g' docker-compose.yml
+docker compose pull
+docker compose up -d
+```
+
+If the web console shows `Cannot find module 'autoprefixer'`, install the missing PostCSS plugin and restart the dev server:
+
+```bash
+pnpm --filter @agent-platform/web-console add -D autoprefixer
+pnpm dev:web
+```
+
+## Run Only Web Console
+
+```bash
+cp .env.example .env
+cp apps/web-console/.env.example apps/web-console/.env
+docker compose up -d
+pnpm dev:web
+```
+
 ## Run Only Analytics Agent
 
 ```bash
