@@ -13,7 +13,6 @@ import {
   Pause,
   Play,
   Radar,
-  ServerCog,
   ShieldAlert,
   SlidersHorizontal,
   Terminal,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { MonitoringAgentControl } from '@/modules/analytics/monitoring-agent-control';
 import { agents, getAgent, summaryTrend } from '@/modules/dashboard/data';
 import { agentStatusPill, normalizeAgentStatus, type AgentDisplayStatus } from '@/modules/dashboard/status';
 
@@ -147,14 +147,6 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {isAnalyticsAgent ? (
-              <Link
-                href="/analytics/monitoring"
-                className="app-button-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
-              >
-                <ServerCog className="size-4" /> Monitoring Control
-              </Link>
-            ) : null}
             {showServiceAnalyticsAction && !isAnalyticsAgent ? (
               <Link
                 href="/analytics/system/rc"
@@ -290,6 +282,7 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
 
 function AnalyticsResponsibilityView({ responsibility }: { responsibility: (typeof analyticsResponsibilities)[number] }) {
   const Icon = responsibility.icon;
+  const isMonitoringResponsibility = responsibility.key === 'monitoring';
 
   return (
     <div className="space-y-4">
@@ -376,6 +369,8 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
           </div>
         </article>
       </section>
+
+      {isMonitoringResponsibility ? <MonitoringAgentControl embedded /> : null}
 
       <section className="grid gap-4 xl:grid-cols-2">
         <Panel title="Recent Analytics Work">

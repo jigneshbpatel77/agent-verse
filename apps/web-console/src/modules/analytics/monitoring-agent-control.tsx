@@ -47,7 +47,7 @@ interface RunLogEntry {
 
 const client = new ApiClient({ baseUrl: typeof window === 'undefined' ? 'http://localhost:3000' : window.location.origin });
 
-export function MonitoringAgentControl() {
+export function MonitoringAgentControl({ embedded = false }: { embedded?: boolean }) {
   const [configuredLogGroups, setConfiguredLogGroups] = useState<string[]>([]);
   const [selectedLogGroups, setSelectedLogGroups] = useState<string[]>([]);
   const [newLogGroup, setNewLogGroup] = useState('');
@@ -216,7 +216,11 @@ export function MonitoringAgentControl() {
     <div className="space-y-6">
       <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="app-heading text-2xl font-semibold tracking-tight">Analytics Monitoring Agent</h1>
+          {embedded ? (
+            <h2 className="app-heading text-xl font-semibold tracking-tight">CloudWatch Monitor Control</h2>
+          ) : (
+            <h1 className="app-heading text-2xl font-semibold tracking-tight">Analytics Monitoring Agent</h1>
+          )}
           <p className="app-muted mt-1 text-sm">Run CloudWatch log analysis continuously or for a fixed number of polling iterations.</p>
         </div>
         <div className="flex flex-wrap gap-2">
