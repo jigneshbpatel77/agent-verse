@@ -165,21 +165,21 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f8fb] text-slate-950 dark:bg-slate-900 dark:text-slate-50">
+    <div className="min-h-screen bg-[#fbfcff] text-[#111827] [background-image:radial-gradient(#eef2f7_1px,transparent_1px)] [background-size:18px_18px] dark:bg-[#0b1020] dark:text-slate-100 dark:[background-image:radial-gradient(rgba(148,163,184,0.12)_1px,transparent_1px)]">
       <aside
-        className={`fixed inset-y-0 left-0 z-40 hidden border-r border-slate-200 bg-white text-slate-950 shadow-sm transition-all duration-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:shadow-none lg:block ${
+        className={`fixed inset-y-0 left-0 z-40 hidden border-r border-[#e6eaf2] bg-white text-[#111827] shadow-none transition-all duration-300 dark:border-slate-700 dark:bg-[#0f172a] dark:text-slate-100 lg:block ${
           collapsed ? 'w-[72px]' : 'w-[280px]'
         }`}
       >
         <div className="flex h-full flex-col">
           <div className="flex h-[88px] items-center gap-3 px-5">
-            <div className="grid size-10 place-items-center rounded-lg bg-gradient-to-br from-blue-500 via-emerald-400 to-amber-400 text-sm font-bold text-white shadow-lg">
+            <div className="grid size-10 place-items-center rounded-lg bg-gradient-to-br from-[#5b4cf6] to-[#7b2eea] text-sm font-bold text-white shadow-lg shadow-[#6246ea]/20">
               AV
             </div>
             {!collapsed ? (
               <div>
                 <p className="text-base font-semibold">AgentVerse</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Multi-Agent Intelligence Platform</p>
+                <p className="text-xs text-[#71809a] dark:text-slate-400">Multi-Agent Intelligence Platform</p>
               </div>
             ) : null}
           </div>
@@ -188,18 +188,18 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
             <SidebarLink collapsed={collapsed} href="/" icon={Home} label="Overview" active={pathname === '/'} />
 
             <div className="mt-5">
-              {!collapsed ? <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Main</p> : null}
+              {!collapsed ? <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-[#71809a] dark:text-slate-400">Main</p> : null}
               <button
                 type="button"
                 onClick={() => setAgentsOpen((value) => !value)}
-                className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200"
               >
-                <User className="size-5 text-blue-400" />
+                <User className="size-5 text-[#6246ea]" />
                 {!collapsed ? (
                   <Link
                     href="/agents/analytics"
                     onClick={(event) => event.stopPropagation()}
-                    className="flex-1 text-left hover:text-slate-950 dark:hover:text-white"
+                    className="flex-1 text-left hover:text-[#4f3ee7] dark:hover:text-violet-200"
                   >
                     Agents
                   </Link>
@@ -211,7 +211,7 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
                 <motion.div
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`mt-1 space-y-1 rounded-xl bg-slate-50 p-2 dark:bg-slate-800/70 ${collapsed ? 'hidden' : ''}`}
+                  className={`mt-1 space-y-1 rounded-xl bg-white p-2 dark:bg-slate-900/80 ${collapsed ? 'hidden' : ''}`}
                 >
                   {agents.map((agent) => {
                     const Icon = agent.icon;
@@ -220,13 +220,13 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
                       <Link
                         key={agent.key}
                         href={`/agents/${agent.key}`}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
+                        className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
                           active
-                            ? 'bg-blue-100 font-semibold text-blue-700 dark:bg-slate-700/80 dark:text-blue-300'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
+                            ? 'bg-[#efecff] font-semibold text-[#4f3ee7] dark:bg-violet-500/15 dark:text-violet-200'
+                            : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
                         }`}
                       >
-                        <Icon className={`size-4 ${active ? 'text-blue-600 dark:text-blue-300' : 'text-slate-500 dark:text-slate-400'}`} />
+                        <Icon className={`size-4 ${active ? 'text-[#6246ea] dark:text-violet-200' : 'text-[#71809a] dark:text-slate-400'}`} />
                         <span className="min-w-0 flex-1 truncate">{agent.name}</span>
                         <span className={agentStatusDot(normalizeAgentStatus(agent.status))} />
                         <span className="text-xs text-slate-500 dark:text-slate-500">{agent.activeTasks}</span>
@@ -251,23 +251,23 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
             </div>
           </nav>
 
-          <div className="border-t border-slate-200 p-4 dark:border-slate-700">
-            <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
+          <div className="border-t border-[#e6eaf2] p-4 dark:border-slate-700">
+            <div className="rounded-xl bg-white p-3 dark:bg-slate-900/80">
               <div className="flex items-center gap-3">
-                <div className="grid size-10 place-items-center rounded-full bg-blue-500 text-sm font-semibold">S</div>
+                <div className="grid size-10 place-items-center rounded-full bg-gradient-to-br from-[#5b4cf6] to-[#7b2eea] text-sm font-semibold text-white">S</div>
                 {!collapsed ? (
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">Sahil JR</p>
-                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">super.admin@cars24.com</p>
+                    <p className="truncate text-xs text-[#71809a] dark:text-slate-400">super.admin@cars24.com</p>
                   </div>
                 ) : null}
               </div>
               {!collapsed ? (
-                <div className="mt-3 grid gap-1 text-sm text-slate-600 dark:text-slate-300">
-                  <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-white/10">
+                <div className="mt-3 grid gap-1 text-sm text-[#4f5d73] dark:text-slate-300">
+                  <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:hover:bg-violet-500/10 dark:hover:text-violet-200">
                     <User className="size-4" /> Profile
                   </button>
-                  <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-white/10">
+                  <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:hover:bg-violet-500/10 dark:hover:text-violet-200">
                     <LogOut className="size-4" /> Logout
                   </button>
                 </div>
@@ -278,32 +278,32 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
       </aside>
 
       <div className={`transition-all duration-300 ${collapsed ? 'lg:pl-[72px]' : 'lg:pl-[280px]'}`}>
-        <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/90 sm:px-6">
+        <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-[#e6eaf2] bg-white/95 px-4 backdrop-blur-xl dark:border-slate-700 dark:bg-[#0f172a]/95 sm:px-6">
           <button
             type="button"
             onClick={() => setCollapsed((value) => !value)}
-            className="hidden rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 lg:block"
+            className="hidden rounded-lg border border-[#e1e6ef] bg-white p-2 text-[#64748b] hover:bg-[#f8faff] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 lg:block"
             aria-label="Toggle sidebar"
           >
             {collapsed ? <PanelLeftOpen className="size-5" /> : <PanelLeftClose className="size-5" />}
           </button>
-          <button className="rounded-lg border border-slate-200 p-2 text-slate-600 dark:border-slate-700 dark:text-slate-200 lg:hidden">
+          <button className="rounded-lg border border-[#e1e6ef] bg-white p-2 text-[#64748b] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 lg:hidden">
             <Menu className="size-5" />
           </button>
 
           <div className="min-w-0">
             <p className="truncate text-lg font-semibold">{pageTitle}</p>
-            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{breadcrumb || eyebrow}</p>
+            <p className="truncate text-xs text-[#71809a] dark:text-slate-400">{breadcrumb || eyebrow}</p>
           </div>
 
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="mx-auto hidden w-full max-w-xl items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-slate-500 shadow-sm hover:bg-white dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-800 md:flex"
+            className="mx-auto hidden w-full max-w-xl items-center gap-3 rounded-xl border border-[#dfe5ee] bg-white px-3 py-2 text-left text-[#71809a] shadow-sm hover:border-[#cfc7ff] hover:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-500/40 dark:hover:bg-slate-900 md:flex"
           >
             <Search className="size-4" />
             <span className="flex-1 text-sm">Search anything...</span>
-            <span className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs dark:border-slate-600 dark:bg-slate-900">
+            <span className="flex items-center gap-1 rounded-md border border-[#e1e6ef] bg-white px-2 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-950">
               <Command className="size-3" /> K
             </span>
           </button>
@@ -312,7 +312,7 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
             <button
               type="button"
               onClick={() => setDarkMode((value) => !value)}
-              className="rounded-full border border-slate-200 bg-white p-2 text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              className="rounded-full border border-[#e1e6ef] bg-white p-2 text-[#64748b] shadow-sm hover:bg-[#f8faff] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               aria-label="Toggle theme"
             >
               {darkMode ? <Sun className="size-5" /> : <Moon className="size-5" />}
@@ -342,9 +342,9 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
                           key={notification.id}
                           type="button"
                           onClick={() => void markNotificationRead(notification.id)}
-                          className="flex w-full gap-3 rounded-lg p-3 text-left hover:bg-slate-100 dark:hover:bg-slate-700/70"
+                          className="flex w-full gap-3 rounded-lg p-3 text-left hover:bg-[#f4f1ff] dark:hover:bg-violet-500/10"
                         >
-                          <span className={`mt-1 size-2 rounded-full ${unread ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                          <span className={`mt-1 size-2 rounded-full ${unread ? 'bg-[#6246ea]' : 'bg-slate-300 dark:bg-slate-600'}`} />
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-medium text-slate-800 dark:text-slate-100">{notification.title}</span>
                             <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{notification.meta}</span>
@@ -368,7 +368,7 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
                 <Popover title="Help">
                   <div className="space-y-2">
                     {helpItems.map((item) => (
-                      <div key={item.label} className="rounded-lg p-3 hover:bg-slate-100 dark:hover:bg-slate-700/70">
+                      <div key={item.label} className="rounded-lg p-3 hover:bg-[#f4f1ff] dark:hover:bg-violet-500/10">
                         <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{item.label}</p>
                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.detail}</p>
                       </div>
@@ -386,10 +386,10 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
       {searchOpen ? (
         <div className="fixed inset-0 z-50 bg-slate-950/40 p-4 backdrop-blur-sm" onClick={() => setSearchOpen(false)}>
           <div
-            className="mx-auto mt-24 max-w-2xl rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-800"
+            className="mx-auto mt-24 max-w-2xl rounded-xl border border-[#e1e6ef] bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+            <div className="flex items-center gap-3 border-b border-[#e1e6ef] px-4 py-3 dark:border-slate-700">
               <Search className="size-5 text-slate-400" />
               <input
                 autoFocus
@@ -398,7 +398,7 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
                 placeholder="Search agents, tasks, reports, metrics, alerts, workflows..."
                 className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
               />
-              <span className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-500 dark:border-slate-600">Esc</span>
+              <span className="rounded-md border border-[#e1e6ef] px-2 py-1 text-xs text-[#71809a] dark:border-slate-700">Esc</span>
             </div>
             <div className="max-h-96 overflow-y-auto p-2">
               {searchResults.map((item) => (
@@ -406,7 +406,7 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
                   key={item.href}
                   href={item.href}
                   onClick={() => setSearchOpen(false)}
-                  className="flex items-center justify-between rounded-lg px-3 py-3 hover:bg-slate-100 dark:hover:bg-slate-700/70"
+                  className="flex items-center justify-between rounded-lg px-3 py-3 hover:bg-[#f4f1ff] dark:hover:bg-violet-500/10"
                 >
                   <span>
                     <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">{item.label}</span>
@@ -454,14 +454,15 @@ function SidebarLink({
   return (
     <Link
       href={href}
-      className={`mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+      className={`relative mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
         active
-          ? 'bg-blue-100 text-blue-700 shadow-none dark:bg-slate-800 dark:text-blue-300'
-          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
+          ? 'bg-[#efecff] text-[#4f3ee7] shadow-none dark:bg-violet-500/15 dark:text-violet-200'
+          : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
       }`}
     >
-      <Icon className="size-5 shrink-0" />
-      {!collapsed ? <span className="truncate">{label}</span> : null}
+      <Icon className={`size-5 shrink-0 ${active ? 'text-[#6246ea] dark:text-violet-200' : 'text-[#71809a] dark:text-slate-400'}`} />
+      {!collapsed ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
+      {active && !collapsed ? <span className="absolute right-3 size-2 rounded-full bg-[#6246ea] dark:bg-violet-300" /> : null}
     </Link>
   );
 }
@@ -471,7 +472,7 @@ function IconButton({ icon: Icon, badge, onClick }: { icon: LucideIcon; badge?: 
     <button
       type="button"
       onClick={onClick}
-      className="relative rounded-full border border-slate-200 bg-white p-2 text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+      className="relative rounded-full border border-[#e1e6ef] bg-white p-2 text-[#64748b] shadow-sm hover:bg-[#f8faff] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
     >
       <Icon className="size-5" />
       {badge ? (
@@ -483,8 +484,8 @@ function IconButton({ icon: Icon, badge, onClick }: { icon: LucideIcon; badge?: 
 
 function Popover({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="absolute right-0 top-12 z-50 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-slate-700 dark:bg-slate-800">
-      <div className="border-b border-slate-200 px-2 pb-2 text-sm font-semibold text-slate-950 dark:border-slate-700 dark:text-slate-50">
+    <div className="absolute right-0 top-12 z-50 w-80 rounded-xl border border-[#e1e6ef] bg-white p-3 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+      <div className="border-b border-[#e1e6ef] px-2 pb-2 text-sm font-semibold text-[#111827] dark:border-slate-700 dark:text-slate-100">
         {title}
       </div>
       <div className="pt-2">{children}</div>

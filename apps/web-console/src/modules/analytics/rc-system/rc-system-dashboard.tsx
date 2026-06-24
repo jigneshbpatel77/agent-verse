@@ -41,9 +41,9 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
       <section className="app-surface rounded-lg p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-blue-600">Service Analytics</p>
+            <p className="text-sm font-medium text-[#6246ea] dark:text-violet-300">Service Analytics</p>
             <h1 className="mt-1 text-2xl font-semibold text-slate-950 dark:text-slate-50">{displayName}</h1>
-            <p className="mt-1 text-sm text-slate-500">Prometheus-backed health and latency analytics for VehicleInfo services.</p>
+            <p className="mt-1 text-sm text-[#71809a] dark:text-slate-400">Prometheus-backed health and latency analytics for VehicleInfo services.</p>
           </div>
           <StatusBadge status={health?.status ?? 'unknown'} />
         </div>
@@ -55,8 +55,8 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
               href={`/analytics/system/${key}`}
               className={`rounded-lg px-3 py-2 text-sm font-medium ${
                 key === serviceKey
-                  ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/70'
+                  ? 'bg-[#efecff] text-[#4f3ee7] dark:bg-violet-500/15 dark:text-violet-200'
+                  : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
               }`}
             >
               {label}
@@ -99,7 +99,7 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-slate-600 dark:text-slate-400">{health ? 'No missing metrics reported.' : unavailable}</p>
+              <p className="text-sm text-[#4f5d73] dark:text-slate-400">{health ? 'No missing metrics reported.' : unavailable}</p>
             )}
           </div>
         </div>
@@ -112,12 +112,12 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
                 {Object.entries(health.raw_prometheus_queries).map(([name, query]) => (
                   <div key={name}>
                     <dt className="font-medium text-slate-800 dark:text-slate-100">{name}</dt>
-                    <dd className="mt-1 break-words font-mono text-xs text-slate-600 dark:text-slate-400">{query}</dd>
+                    <dd className="mt-1 break-words font-mono text-xs text-[#4f5d73] dark:text-slate-400">{query}</dd>
                   </div>
                 ))}
               </dl>
             ) : (
-              <p className="text-sm text-slate-600 dark:text-slate-400">{unavailable}</p>
+              <p className="text-sm text-[#4f5d73] dark:text-slate-400">{unavailable}</p>
             )}
           </div>
         </div>
@@ -142,14 +142,14 @@ async function fetchServiceHealth(serviceKey: string): Promise<{ health: RcHealt
 function MetricCard({ label, value, suffix }: { label: string; value: string | null; suffix?: string }) {
   return (
     <article className="min-h-32 app-surface rounded-lg p-4">
-      <p className="text-sm font-medium text-slate-500">{label}</p>
+      <p className="text-sm font-medium text-[#71809a] dark:text-slate-400">{label}</p>
       {value ? (
         <p className="mt-3 text-2xl font-semibold text-slate-950 dark:text-slate-50">
           {value}
-          {suffix ? <span className="ml-1 text-sm font-medium text-slate-500">{suffix}</span> : null}
+          {suffix ? <span className="ml-1 text-sm font-medium text-[#71809a] dark:text-slate-400">{suffix}</span> : null}
         </p>
       ) : (
-        <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-400">{unavailable}</p>
+        <p className="mt-3 text-sm leading-6 text-[#4f5d73] dark:text-slate-400">{unavailable}</p>
       )}
     </article>
   );

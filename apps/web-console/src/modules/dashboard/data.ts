@@ -43,7 +43,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.12s',
     lastActivity: '42s ago',
     version: 'v1.8.2',
-    accent: 'text-blue-500 bg-blue-50 dark:bg-blue-950/40',
+    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40',
   },
   {
     key: 'research',
@@ -69,7 +69,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.28s',
     lastActivity: '3m ago',
     version: 'v1.7.1',
-    accent: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/40',
+    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40',
   },
   {
     key: 'engineering',
@@ -134,7 +134,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.78s',
     lastActivity: '8m ago',
     version: 'v1.3.5',
-    accent: 'text-purple-500 bg-purple-50 dark:bg-purple-950/40',
+    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40',
   },
   {
     key: 'product',
@@ -199,7 +199,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '0.88s',
     lastActivity: '12s ago',
     version: 'v2.2.4',
-    accent: 'text-violet-500 bg-violet-50 dark:bg-violet-950/40',
+    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40',
   },
 ];
 
@@ -216,7 +216,7 @@ export const summaryTrend = [
 
 export const taskStatusData = [
   { name: 'Completed', value: 1156, color: '#22c55e' },
-  { name: 'Running', value: 132, color: '#4f46e5' },
+  { name: 'Running', value: 132, color: '#6246ea' },
   { name: 'Failed', value: 67, color: '#ef4444' },
   { name: 'Pending', value: 48, color: '#f59e0b' },
 ];

@@ -4,8 +4,8 @@
 
 body {
   margin: 0;
-  background: #f6f8fb;
-  color: #111827;
+  background: #fbfcff;
+  color: #0f172a;
   font-feature-settings:
     "rlig" 1,
     "calt" 1;
@@ -16,21 +16,21 @@ body {
 }
 
 html.dark body {
-  background: #101828;
-  color: #f8fafc;
+  background: #0b1020;
+  color: #e5e7eb;
 }
 
 @layer components {
   .app-surface {
-    @apply border border-slate-200 bg-white shadow-sm dark:border-slate-700/70 dark:bg-slate-800/80 dark:shadow-none;
+    @apply border border-[#e6eaf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-slate-700 dark:bg-slate-900 dark:shadow-none;
   }
 
   .app-surface-subtle {
-    @apply border border-slate-100 bg-slate-50 dark:border-slate-700/70 dark:bg-slate-900/40;
+    @apply border border-[#e6eaf2] bg-white dark:border-slate-700 dark:bg-slate-950/40;
   }
 
   .app-muted {
-    @apply text-slate-500 dark:text-slate-300;
+    @apply text-slate-500 dark:text-slate-400;
   }
 
   .app-muted-strong {
@@ -38,10 +38,14 @@ html.dark body {
   }
 
   .app-heading {
-    @apply text-slate-950 dark:text-slate-50;
+    @apply text-slate-950 dark:text-slate-100;
   }
 
   .app-button-secondary {
-    @apply border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 dark:hover:bg-slate-800;
+    @apply border border-[#e1e6ef] bg-white text-[#111827] hover:bg-[#f8faff] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800;
+  }
+
+  .app-button-primary {
+    @apply bg-gradient-to-r from-[#5b4cf6] to-[#7b2eea] text-white shadow-sm shadow-[#6246ea]/20 hover:from-[#5142e8] hover:to-[#6f26dc];
   }
 }
