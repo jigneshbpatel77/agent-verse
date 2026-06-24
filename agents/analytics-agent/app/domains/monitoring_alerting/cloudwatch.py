@@ -1,8 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import logging
+from typing import Any
 from typing import Iterable, Optional
-
-import boto3
 
 from app.domains.monitoring_alerting.schemas import LogEvent
 
@@ -17,7 +16,16 @@ class CloudWatchLogReader:
         aws_secret_access_key: Optional[str] = None,
         aws_session_token: Optional[str] = None,
     ) -> None:
-        client_kwargs = {"region_name": region_name}
+        try:
+            import boto3
+        except ModuleNotFoundError as exc:
+            raise ValueError(
+                "The 'boto3' package is required for CloudWatch monitoring. "
+                "Install analytics-agent dependencies with `python -m pip install -e .` "
+                "from agents/analytics-agent."
+            ) from exc
+
+        client_kwargs: dict[str, Any] = {"region_name": region_name}
         if aws_access_key_id and aws_secret_access_key:
             client_kwargs["aws_access_key_id"] = aws_access_key_id
             client_kwargs["aws_secret_access_key"] = aws_secret_access_key

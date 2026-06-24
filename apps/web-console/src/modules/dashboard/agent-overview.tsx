@@ -75,22 +75,22 @@ export function AgentOverview() {
             <button
               type="button"
               onClick={() => setDatePickerOpen((value) => !value)}
-              className="inline-flex min-w-[260px] items-center justify-between gap-3 rounded-lg border border-[#e1e6ef] bg-white px-3.5 py-2 text-left shadow-sm transition hover:border-[#cfc7ff] hover:bg-[#fbfcff] dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200"
+              className="inline-flex min-w-[260px] items-center justify-between gap-3 rounded-lg border border-[#e1e6ef] bg-white px-3.5 py-2 text-left shadow-sm transition hover:border-[#cfc7ff] hover:bg-[#fbfcff] focus:border-[#6246ea] focus:outline-none focus:ring-2 focus:ring-[#d8d1ff] dark:border-[#263247] dark:bg-[#111827] dark:text-slate-200 dark:hover:border-violet-500/50 dark:hover:bg-[#182338] dark:focus:border-violet-400 dark:focus:ring-violet-500/20"
             >
               <span className="inline-flex min-w-0 items-center gap-3">
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#efecff] text-[#6246ea]">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
                   <CalendarDays className="size-4" />
                 </span>
                 <span className="min-w-0 leading-tight">
                   <span className="block truncate text-sm font-semibold text-[#111827] dark:text-slate-100">{selectedPreset?.label ?? 'Custom range'}</span>
-                  <span className="mt-0.5 block truncate text-xs font-medium text-[#71809a]">{formatDateRange(dateRange)}</span>
+                  <span className="mt-0.5 block truncate text-xs font-medium text-[#71809a] dark:text-slate-400">{formatDateRange(dateRange)}</span>
                 </span>
               </span>
-              <ChevronDown className="size-4 text-[#71809a]" />
+              <ChevronDown className="size-4 text-[#71809a] dark:text-slate-400" />
             </button>
 
             {datePickerOpen ? (
-              <div className="absolute right-0 z-20 mt-2 w-[340px] rounded-xl border border-[#e1e6ef] bg-white p-4 shadow-[0_18px_48px_rgba(15,23,42,0.14)] dark:border-slate-700 dark:bg-slate-900">
+              <div className="absolute right-0 z-20 mt-2 w-[340px] rounded-xl border border-[#e1e6ef] bg-white p-4 shadow-[0_18px_48px_rgba(15,23,42,0.14)] dark:border-[#263247] dark:bg-[#111827] dark:shadow-none">
                 <div className="grid grid-cols-2 gap-2">
                   {datePresets.map((preset) => (
                     <button
@@ -99,8 +99,8 @@ export function AgentOverview() {
                       onClick={() => setDateRange(presetDateRange(preset.key))}
                       className={`rounded-lg px-3 py-2 text-left text-sm font-semibold transition ${
                         dateRange.preset === preset.key
-                          ? 'bg-[#efecff] text-[#4f3ee7]'
-                          : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10'
+                          ? 'bg-[#efecff] text-[#4f3ee7] dark:bg-violet-500/15 dark:text-violet-200'
+                          : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
                       }`}
                     >
                       {preset.label}
@@ -108,8 +108,8 @@ export function AgentOverview() {
                   ))}
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#e6eaf2] pt-4 dark:border-slate-700">
-                  <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#71809a]">
+                <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#e6eaf2] pt-4 dark:border-[#263247]">
+                  <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#71809a] dark:text-slate-400">
                     Start date
                     <input
                       type="date"
@@ -117,10 +117,10 @@ export function AgentOverview() {
                       onChange={(event) =>
                         setDateRange((current) => ({ ...current, preset: 'custom', startDate: event.target.value }))
                       }
-                      className="h-10 rounded-lg border border-[#e1e6ef] bg-white px-2.5 text-sm font-semibold normal-case tracking-normal text-[#111827] outline-none transition focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      className="h-10 rounded-lg border border-[#e1e6ef] bg-white px-2.5 text-sm font-semibold normal-case tracking-normal text-[#111827] outline-none transition focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] dark:border-[#263247] dark:bg-[#0b1020] dark:text-slate-100 dark:[color-scheme:dark] dark:focus:border-violet-400 dark:focus:ring-violet-500/20"
                     />
                   </label>
-                  <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#71809a]">
+                  <label className="grid gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#71809a] dark:text-slate-400">
                     End date
                     <input
                       type="date"
@@ -129,13 +129,13 @@ export function AgentOverview() {
                       onChange={(event) =>
                         setDateRange((current) => ({ ...current, preset: 'custom', endDate: event.target.value }))
                       }
-                      className="h-10 rounded-lg border border-[#e1e6ef] bg-white px-2.5 text-sm font-semibold normal-case tracking-normal text-[#111827] outline-none transition focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      className="h-10 rounded-lg border border-[#e1e6ef] bg-white px-2.5 text-sm font-semibold normal-case tracking-normal text-[#111827] outline-none transition focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] dark:border-[#263247] dark:bg-[#0b1020] dark:text-slate-100 dark:[color-scheme:dark] dark:focus:border-violet-400 dark:focus:ring-violet-500/20"
                     />
                   </label>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between gap-3">
-                  <p className="min-w-0 truncate text-xs font-medium text-[#71809a]">{formatDateRange(dateRange)}</p>
+                  <p className="min-w-0 truncate text-xs font-medium text-[#71809a] dark:text-slate-400">{formatDateRange(dateRange)}</p>
                   <button
                     type="button"
                     onClick={() => setDatePickerOpen(false)}
@@ -172,7 +172,7 @@ export function AgentOverview() {
               </div>
               <p className="mt-2 text-sm text-[#71809a] dark:text-slate-400">{card.detail}</p>
               <div className="mt-3 flex items-center justify-between">
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/40">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300">
                   {card.trend.startsWith('-') ? <TrendingDown className="size-3" /> : <TrendingUp className="size-3" />}
                   {card.trend}
                 </span>
@@ -194,7 +194,7 @@ export function AgentOverview() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-sm">
               <thead>
-                <tr className="border-b border-[#e6eaf2] text-left text-xs font-semibold uppercase text-[#71809a] dark:border-slate-700">
+                <tr className="border-b border-[#e6eaf2] text-left text-xs font-semibold uppercase text-[#71809a] dark:border-[#263247]">
                   <th className="px-1 py-3">Agent</th>
                   <th className="px-1 py-3">Status</th>
                   <th className="px-1 py-3">Tasks</th>
@@ -208,7 +208,7 @@ export function AgentOverview() {
                 {agents.slice(0, 8).map((agent) => {
                   const Icon = agent.icon;
                   return (
-                    <tr key={agent.key} className="border-b border-[#eef1f6] hover:bg-[#f8faff] dark:border-slate-700 dark:hover:bg-slate-700/70/60">
+                    <tr key={agent.key} className="border-b border-[#eef1f6] transition-colors hover:bg-[#f8faff] dark:border-[#263247] dark:hover:bg-[#182338]">
                       <td className="px-1 py-3">
                         <div className="flex items-center gap-3">
                           <div className={`grid size-8 place-items-center rounded-lg ${agent.accent}`}>
@@ -232,7 +232,7 @@ export function AgentOverview() {
                       <td className="px-1 py-3 text-[#4f5d73] dark:text-slate-300">{agent.avgResponseTime}</td>
                       <td className="px-1 py-3 text-[#71809a] dark:text-slate-400">{agent.lastActivity}</td>
                       <td className="px-1 py-3 text-right">
-                        <Link href={`/agents/${agent.key}`} className="inline-flex rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700/70">
+                        <Link href={`/agents/${agent.key}`} className="inline-flex rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-[#182338] dark:hover:text-slate-100">
                           <ArrowRight className="size-4" />
                         </Link>
                       </td>
@@ -247,7 +247,7 @@ export function AgentOverview() {
         <Panel title="System Health" action="View system status">
           <table className="w-full text-sm">
             <thead>
-                <tr className="border-b border-[#e6eaf2] text-left text-xs font-semibold uppercase text-[#71809a] dark:border-slate-700">
+                <tr className="border-b border-[#e6eaf2] text-left text-xs font-semibold uppercase text-[#71809a] dark:border-[#263247]">
                 <th className="py-3">Component</th>
                 <th className="py-3">Status</th>
                 <th className="py-3">Uptime</th>
@@ -256,7 +256,7 @@ export function AgentOverview() {
             </thead>
             <tbody>
               {systemComponents.map((component) => (
-                <tr key={component.name} className="border-b border-[#eef1f6] dark:border-slate-700">
+                <tr key={component.name} className="border-b border-[#eef1f6] dark:border-[#263247]">
                   <td className="py-3 font-medium text-slate-700 dark:text-slate-200">{component.name}</td>
                   <td className="py-3 text-emerald-600">Healthy</td>
                   <td className="py-3 text-[#71809a] dark:text-slate-400">{component.uptime}</td>
@@ -291,8 +291,8 @@ export function AgentOverview() {
         <Panel title="Recent Alerts" action="View all">
           <div className="space-y-3">
             {recentAlerts.map((alert) => (
-              <div key={alert.title} className="flex items-start gap-3 rounded-lg border border-[#e6eaf2] p-3 dark:border-slate-700">
-                <div className="grid size-9 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/40">
+              <div key={alert.title} className="flex items-start gap-3 rounded-lg border border-[#e6eaf2] p-3 dark:border-[#263247]">
+                <div className="grid size-9 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300">
                   <AlertTriangle className="size-4" />
                 </div>
                 <div className="min-w-0 flex-1">

@@ -1,6 +1,4 @@
-from typing import Protocol
-
-from openai import OpenAI
+from typing import Any, Protocol
 
 from app.config.settings import Settings
 
@@ -12,11 +10,19 @@ class LogAnalysisLLM(Protocol):
 
 class OpenAICompatibleChatAdapter:
     def __init__(self, api_key: str, model: str, base_url: str | None = None) -> None:
+        self._api_key = api_key
+        try:
+            from openai import OpenAI  # noqa: F401
+        except ModuleNotFoundError:
+            self._client = None
+        else:
+            self._client = OpenAI(api_key=api_key, base_url=base_url)
+        self._base_url = base_url
         self._model = model
-        self._client = OpenAI(api_key=api_key, base_url=base_url)
 
     def analyze_logs(self, system_prompt: str, user_prompt: str) -> str:
-        response = self._client.chat.completions.create(
+        client = self._get_client()
+        response = client.chat.completions.create(
             model=self._model,
             temperature=0,
             response_format={"type": "json_object"},
@@ -26,6 +32,21 @@ class OpenAICompatibleChatAdapter:
             ],
         )
         return response.choices[0].message.content or "{}"
+
+    def _get_client(self) -> Any:
+        if self._client is None:
+            try:
+                from openai import OpenAI
+            except ModuleNotFoundError as exc:
+                raise ValueError(
+                    "The 'openai' package is required for LLM log analysis. "
+                    "Install analytics-agent dependencies with `python -m pip install -e .` "
+                    "from agents/analytics-agent."
+                ) from exc
+
+            self._client = OpenAI(api_key=self._api_key, base_url=self._base_url)
+
+        return self._client
 
 
 def build_log_analysis_adapter(settings: Settings) -> LogAnalysisLLM:

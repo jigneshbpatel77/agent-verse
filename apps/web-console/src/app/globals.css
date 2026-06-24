@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:ital,wght@0,100..900;1,100..900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,6 +9,7 @@ body {
   margin: 0;
   background: #fbfcff;
   color: #0f172a;
+  font-family: "Geist", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-feature-settings:
     "rlig" 1,
     "calt" 1;
@@ -15,18 +19,31 @@ body {
   box-sizing: border-box;
 }
 
+code,
+kbd,
+pre,
+samp,
+.font-mono {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
 html.dark body {
   background: #0b1020;
   color: #e5e7eb;
+  color-scheme: dark;
+}
+
+html:not(.dark) body {
+  color-scheme: light;
 }
 
 @layer components {
   .app-surface {
-    @apply border border-[#e6eaf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-slate-700 dark:bg-slate-900 dark:shadow-none;
+    @apply border border-[#e6eaf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-[#263247] dark:bg-[#111827] dark:shadow-none;
   }
 
   .app-surface-subtle {
-    @apply border border-[#e6eaf2] bg-white dark:border-slate-700 dark:bg-slate-950/40;
+    @apply border border-[#e6eaf2] bg-white dark:border-[#263247] dark:bg-[#0f172a];
   }
 
   .app-muted {
@@ -42,10 +59,10 @@ html.dark body {
   }
 
   .app-button-secondary {
-    @apply border border-[#e1e6ef] bg-white text-[#111827] hover:bg-[#f8faff] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800;
+    @apply border border-[#e1e6ef] bg-white text-[#111827] hover:bg-[#f8faff] dark:border-[#263247] dark:bg-[#0f172a] dark:text-slate-100 dark:hover:bg-[#182338];
   }
 
   .app-button-primary {
-    @apply bg-gradient-to-r from-[#5b4cf6] to-[#7b2eea] text-white shadow-sm shadow-[#6246ea]/20 hover:from-[#5142e8] hover:to-[#6f26dc];
+    @apply bg-gradient-to-r from-[#5b4cf6] to-[#7b2eea] text-white shadow-sm shadow-[#6246ea]/20 hover:from-[#5142e8] hover:to-[#6f26dc] disabled:from-slate-300 disabled:to-slate-300 disabled:text-white disabled:shadow-none dark:disabled:from-[#263247] dark:disabled:to-[#263247] dark:disabled:text-slate-500;
   }
 }

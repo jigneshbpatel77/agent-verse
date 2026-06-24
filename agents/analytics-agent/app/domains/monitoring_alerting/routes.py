@@ -28,7 +28,11 @@ def analyze(request: AnalysisRequest) -> AnalysisResult:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     events = [LogEvent(source=request.source, message=message) for message in request.messages]
-    result = analyzer.analyze(request.source, events)
+    try:
+        result = analyzer.analyze(request.source, events)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     AlertDispatcher(settings).dispatch_if_needed(result)
     return result
 
@@ -102,6 +106,10 @@ def ingest_cloudwatch_subscription(payload: dict[str, Any]) -> AnalysisResult:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    result = analyzer.analyze("cloudwatch-subscription", events)
+    try:
+        result = analyzer.analyze("cloudwatch-subscription", events)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     AlertDispatcher(settings).dispatch_if_needed(result)
     return result

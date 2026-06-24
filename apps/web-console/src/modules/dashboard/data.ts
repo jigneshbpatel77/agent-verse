@@ -43,7 +43,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.12s',
     lastActivity: '42s ago',
     version: 'v1.8.2',
-    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40',
+    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40 dark:text-violet-300',
   },
   {
     key: 'research',
@@ -56,7 +56,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.35s',
     lastActivity: '1m ago',
     version: 'v1.6.9',
-    accent: 'text-cyan-500 bg-cyan-50 dark:bg-cyan-950/40',
+    accent: 'text-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 dark:text-cyan-300',
   },
   {
     key: 'architecture',
@@ -69,7 +69,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.28s',
     lastActivity: '3m ago',
     version: 'v1.7.1',
-    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40',
+    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40 dark:text-violet-300',
   },
   {
     key: 'engineering',
@@ -82,7 +82,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.45s',
     lastActivity: '18s ago',
     version: 'v2.1.0',
-    accent: 'text-orange-500 bg-orange-50 dark:bg-orange-950/40',
+    accent: 'text-orange-500 bg-orange-50 dark:bg-orange-950/40 dark:text-orange-300',
   },
   {
     key: 'security',
@@ -95,7 +95,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.02s',
     lastActivity: '5m ago',
     version: 'v1.5.4',
-    accent: 'text-red-500 bg-red-50 dark:bg-red-950/40',
+    accent: 'text-red-500 bg-red-50 dark:bg-red-950/40 dark:text-red-300',
   },
   {
     key: 'quality',
@@ -108,7 +108,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.67s',
     lastActivity: '2m ago',
     version: 'v1.9.3',
-    accent: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40',
+    accent: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300',
   },
   {
     key: 'content',
@@ -121,7 +121,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.22s',
     lastActivity: '22m ago',
     version: 'v1.4.8',
-    accent: 'text-yellow-500 bg-yellow-50 dark:bg-yellow-950/40',
+    accent: 'text-yellow-500 bg-yellow-50 dark:bg-yellow-950/40 dark:text-yellow-300',
   },
   {
     key: 'legal-finance',
@@ -134,7 +134,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.78s',
     lastActivity: '8m ago',
     version: 'v1.3.5',
-    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40',
+    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40 dark:text-violet-300',
   },
   {
     key: 'product',
@@ -147,7 +147,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.31s',
     lastActivity: '4m ago',
     version: 'v1.2.8',
-    accent: 'text-pink-500 bg-pink-50 dark:bg-pink-950/40',
+    accent: 'text-pink-500 bg-pink-50 dark:bg-pink-950/40 dark:text-pink-300',
   },
   {
     key: 'devops',
@@ -160,7 +160,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '0.96s',
     lastActivity: '35s ago',
     version: 'v2.0.2',
-    accent: 'text-sky-500 bg-sky-50 dark:bg-sky-950/40',
+    accent: 'text-sky-500 bg-sky-50 dark:bg-sky-950/40 dark:text-sky-300',
   },
   {
     key: 'growth',
@@ -173,7 +173,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.56s',
     lastActivity: '31m ago',
     version: 'v1.1.7',
-    accent: 'text-lime-600 bg-lime-50 dark:bg-lime-950/40',
+    accent: 'text-lime-600 bg-lime-50 dark:bg-lime-950/40 dark:text-lime-300',
   },
   {
     key: 'support',
@@ -186,7 +186,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '1.18s',
     lastActivity: '55s ago',
     version: 'v1.6.1',
-    accent: 'text-teal-500 bg-teal-50 dark:bg-teal-950/40',
+    accent: 'text-teal-500 bg-teal-50 dark:bg-teal-950/40 dark:text-teal-300',
   },
   {
     key: 'orchestration',
@@ -199,7 +199,7 @@ export const agents: AgentRecord[] = [
     avgResponseTime: '0.88s',
     lastActivity: '12s ago',
     version: 'v2.2.4',
-    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40',
+    accent: 'text-[#6246ea] bg-[#efecff] dark:bg-violet-950/40 dark:text-violet-300',
   },
 ];
 

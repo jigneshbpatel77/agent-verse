@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  Loader2,
   Plus,
   ListChecks,
   Play,
@@ -58,6 +59,10 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
   const [completedIterations, setCompletedIterations] = useState(0);
   const [lastResult, setLastResult] = useState<PollResult | null>(null);
   const [runLog, setRunLog] = useState<RunLogEntry[]>([]);
+  const [logGroupsLoading, setLogGroupsLoading] = useState(true);
+  const [addingLogGroup, setAddingLogGroup] = useState(false);
+  const [removingLogGroup, setRemovingLogGroup] = useState<string | null>(null);
+  const [polling, setPolling] = useState(false);
   const stopRequestedRef = useRef(false);
 
   const selectedCount = selectedLogGroups.length;
@@ -93,6 +98,11 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
         if (!cancelled) {
           addLog('error', `Could not load configured log groups: ${error.message}`);
         }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLogGroupsLoading(false);
+        }
       });
 
     return () => {
@@ -100,7 +110,7 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
     };
   }, [addLog]);
 
-  const canStart = runState === 'idle' && selectedCount > 0;
+  const canStart = runState === 'idle' && selectedCount > 0 && !logGroupsLoading;
   const progressLabel = useMemo(() => {
     if (runMode === 'continuous') {
       return `${completedIterations} completed`;
@@ -110,18 +120,23 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
 
   async function runOneIteration(iterationNumber: number) {
     addLog('info', `Iteration ${iterationNumber}: fetching last 2 minutes from ${selectedCount} log group${selectedCount === 1 ? '' : 's'}.`);
-    const result = await client.post<PollResult>('/api/analytics-agent/api/v1/monitoring-alerting/cloudwatch/poll', {
-      log_groups: selectedLogGroups,
-    });
-    setLastResult(result);
-    setCompletedIterations((value) => value + 1);
+    setPolling(true);
+    try {
+      const result = await client.post<PollResult>('/api/analytics-agent/api/v1/monitoring-alerting/cloudwatch/poll', {
+        log_groups: selectedLogGroups,
+      });
+      setLastResult(result);
+      setCompletedIterations((value) => value + 1);
 
-    const severity = result.analysis?.highest_severity ?? 'none';
-    const findings = result.analysis?.findings.length ?? 0;
-    addLog(
-      severity === 'none' ? 'success' : severity === 'low' ? 'warning' : 'error',
-      `Iteration ${iterationNumber}: ${result.event_count} events analyzed, severity ${severity}, findings ${findings}.`,
-    );
+      const severity = result.analysis?.highest_severity ?? 'none';
+      const findings = result.analysis?.findings.length ?? 0;
+      addLog(
+        severity === 'none' ? 'success' : severity === 'low' ? 'warning' : 'error',
+        `Iteration ${iterationNumber}: ${result.event_count} events analyzed, severity ${severity}, findings ${findings}.`,
+      );
+    } finally {
+      setPolling(false);
+    }
   }
 
   async function startRun() {
@@ -174,12 +189,17 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
   }
 
   async function addLogGroup() {
+    if (addingLogGroup) {
+      return;
+    }
+
     const logGroup = newLogGroup.trim();
     if (!logGroup) {
       addLog('warning', 'Enter a CloudWatch log group name before adding.');
       return;
     }
 
+    setAddingLogGroup(true);
     try {
       const groups = await client.post<string[]>('/api/analytics-agent/api/v1/monitoring-alerting/cloudwatch/log-groups', {
         log_group: logGroup,
@@ -190,10 +210,17 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
       addLog('success', `Added CloudWatch log group ${logGroup}.`);
     } catch (error) {
       addLog('error', error instanceof Error ? error.message : 'Could not add log group.');
+    } finally {
+      setAddingLogGroup(false);
     }
   }
 
   async function removeLogGroup(logGroup: string) {
+    if (removingLogGroup) {
+      return;
+    }
+
+    setRemovingLogGroup(logGroup);
     try {
       const groups = await client.post<string[]>('/api/analytics-agent/api/v1/monitoring-alerting/cloudwatch/log-groups/remove', {
         log_group: logGroup,
@@ -203,6 +230,8 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
       addLog('warning', `Removed CloudWatch log group ${logGroup}.`);
     } catch (error) {
       addLog('error', error instanceof Error ? error.message : 'Could not remove log group.');
+    } finally {
+      setRemovingLogGroup(null);
     }
   }
 
@@ -214,12 +243,12 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <section className={`${embedded ? 'flex flex-col gap-4 md:flex-row md:items-end md:justify-between' : 'app-surface flex flex-col gap-4 rounded-lg p-5 md:flex-row md:items-end md:justify-between'}`}>
         <div>
           {embedded ? (
             <h2 className="app-heading text-xl font-semibold tracking-tight">CloudWatch Monitor Control</h2>
           ) : (
-            <h1 className="app-heading text-2xl font-semibold tracking-tight">Analytics Monitoring Agent</h1>
+            <h1 className="app-heading text-2xl font-semibold tracking-tight">Monitoring & Alerting</h1>
           )}
           <p className="app-muted mt-1 text-sm">Run CloudWatch log analysis continuously or for a fixed number of polling iterations.</p>
         </div>
@@ -237,7 +266,7 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
               type="button"
               disabled={!canStart}
               onClick={() => void startRun()}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="app-button-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed"
             >
               <Play className="size-4" />
               Start
@@ -256,9 +285,9 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
       </section>
 
       <section className="grid gap-4 md:grid-cols-4">
-        <Metric title="Run State" value={runState} icon={ServerCog} tone={runState === 'running' ? 'text-emerald-600' : 'text-blue-600'} />
-        <Metric title="Progress" value={progressLabel} icon={ListChecks} tone="text-indigo-600" />
-        <Metric title="Last Event Count" value={String(lastResult?.event_count ?? 0)} icon={Clock3} tone="text-sky-600" />
+        <Metric title="Run State" value={runState} icon={ServerCog} tone={runState === 'running' ? 'text-emerald-600' : 'text-[#6246ea]'} loading={polling} />
+        <Metric title="Progress" value={progressLabel} icon={ListChecks} tone="text-[#6246ea]" />
+        <Metric title="Last Event Count" value={String(lastResult?.event_count ?? 0)} icon={Clock3} tone="text-[#6246ea]" loading={polling} />
         <Metric title="Highest Severity" value={highestSeverity} icon={AlertTriangle} tone={severityTone(highestSeverity)} />
       </section>
 
@@ -269,7 +298,7 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
           <div className="mt-5 space-y-5">
             <div>
               <label className="app-muted-strong text-sm font-medium">Mode</label>
-              <div className="mt-2 grid grid-cols-2 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900/40">
+              <div className="mt-2 grid grid-cols-2 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-1 dark:border-[#263247] dark:bg-[#0f172a]">
                 {(['continuous', 'iterations'] as const).map((mode) => (
                   <button
                     key={mode}
@@ -277,8 +306,8 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
                     onClick={() => setRunMode(mode)}
                     className={`rounded-md px-3 py-2 text-sm font-semibold capitalize ${
                       runMode === mode
-                        ? 'bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-300'
-                        : 'text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white'
+                        ? 'bg-white text-[#4f3ee7] shadow-sm dark:bg-violet-500/15 dark:text-violet-200'
+                        : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
                     }`}
                   >
                     {mode}
@@ -302,7 +331,10 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
             <div>
               <div className="flex items-center justify-between">
                 <label className="app-muted-strong text-sm font-medium">Log groups</label>
-                <span className="app-muted text-xs">{selectedCount} selected</span>
+                <span className="app-muted inline-flex items-center gap-1.5 text-xs">
+                  {logGroupsLoading ? <Spinner className="size-3.5" /> : null}
+                  {logGroupsLoading ? 'Loading groups' : `${selectedCount} selected`}
+                </span>
               </div>
               <div className="mt-2 flex gap-2">
                 <input
@@ -316,19 +348,25 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
                     }
                   }}
                   placeholder="/aws/lambda/service-name"
-                  className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 font-mono text-xs outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900"
+                  className="h-10 min-w-0 flex-1 rounded-lg border border-[#e6eaf2] bg-white px-3 font-mono text-xs text-[#111827] outline-none transition focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] dark:border-[#263247] dark:bg-[#0b1020] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-violet-400 dark:focus:ring-violet-500/20"
                 />
                 <button
                   type="button"
+                  disabled={addingLogGroup || !newLogGroup.trim()}
                   onClick={() => void addLogGroup()}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white"
+                  className="app-button-primary inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold disabled:cursor-not-allowed"
                 >
-                  <Plus className="size-4" />
-                  Add
+                  {addingLogGroup ? <Spinner className="size-4" /> : <Plus className="size-4" />}
+                  {addingLogGroup ? 'Adding' : 'Add'}
                 </button>
               </div>
               <div className="mt-2 space-y-2">
-                {configuredLogGroups.length ? (
+                {logGroupsLoading ? (
+                  <div className="app-surface-subtle flex items-center gap-2 rounded-lg p-3 text-sm text-[#4f5d73] dark:text-slate-300">
+                    <Spinner className="size-4 text-[#6246ea]" />
+                    Loading CloudWatch groups...
+                  </div>
+                ) : configuredLogGroups.length ? (
                   configuredLogGroups.map((logGroup) => (
                     <label
                       key={logGroup}
@@ -338,18 +376,20 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
                         type="checkbox"
                         checked={selectedLogGroups.includes(logGroup)}
                         onChange={() => toggleLogGroup(logGroup)}
-                        className="size-4 rounded border-slate-300 text-blue-600"
+                        className="size-4 rounded border-[#d8d1ff] accent-[#6246ea]"
                       />
-                      <span className="min-w-0 flex-1 break-all font-mono text-xs text-slate-700 dark:text-slate-200">{logGroup}</span>
+                      <span className="min-w-0 flex-1 break-all font-mono text-xs text-[#4f5d73] dark:text-slate-200">{logGroup}</span>
                       <button
                         type="button"
+                        disabled={removingLogGroup === logGroup}
                         onClick={(event) => {
                           event.preventDefault();
                           void removeLogGroup(logGroup);
                         }}
-                        className="rounded-md px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-950/30"
                       >
-                        Remove
+                        {removingLogGroup === logGroup ? <Spinner className="size-3" /> : null}
+                        {removingLogGroup === logGroup ? 'Removing' : 'Remove'}
                       </button>
                     </label>
                   ))
@@ -370,9 +410,14 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
               <p className="app-muted mt-1 text-sm">The latest poll result from the analytics agent.</p>
             </div>
             {lastResult?.analysis ? (
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${severityBadge(lastResult.analysis.highest_severity)}`}>
-                {lastResult.analysis.highest_severity}
-              </span>
+              <div className="flex items-center gap-2">
+                {polling ? <Spinner className="size-4 text-[#6246ea]" /> : null}
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${severityBadge(lastResult.analysis.highest_severity)}`}>
+                  {lastResult.analysis.highest_severity}
+                </span>
+              </div>
+            ) : polling ? (
+              <Spinner className="size-4 text-[#6246ea]" />
             ) : null}
           </div>
 
@@ -397,17 +442,24 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
                 <h3 className="app-muted-strong text-sm font-semibold">Evidence</h3>
                 <div className="mt-2 space-y-2">
                   {latestFinding.evidence.map((item) => (
-                    <p key={item} className="app-surface-subtle rounded-lg p-3 font-mono text-xs text-slate-700 dark:text-slate-200">
+                    <p key={item} className="app-surface-subtle rounded-lg p-3 font-mono text-xs text-[#4f5d73] dark:text-slate-200">
                       {item}
                     </p>
                   ))}
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="mt-5 grid min-h-64 place-items-center rounded-lg border border-dashed border-slate-200 text-center dark:border-slate-700">
+          ) : polling ? (
+            <div className="mt-5 grid min-h-64 place-items-center rounded-lg border border-dashed border-[#d8d1ff] bg-[#fbfcff] text-center dark:border-[#263247] dark:bg-[#0f172a]">
               <div>
-                <ServerCog className="mx-auto size-8 text-slate-400" />
+                <Spinner className="mx-auto size-8 text-[#6246ea]" />
+                <p className="app-muted mt-2 text-sm">Analyzing latest CloudWatch events...</p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 grid min-h-64 place-items-center rounded-lg border border-dashed border-[#d8d1ff] bg-[#fbfcff] text-center dark:border-[#263247] dark:bg-[#0f172a]">
+              <div>
+                <ServerCog className="mx-auto size-8 text-[#6246ea] dark:text-violet-300" />
                 <p className="app-muted mt-2 text-sm">Start a run to see CloudWatch analysis.</p>
               </div>
             </div>
@@ -423,10 +475,10 @@ export function MonitoringAgentControl({ embedded = false }: { embedded?: boolea
         <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
           {runLog.length ? (
             runLog.map((entry) => (
-              <div key={entry.id} className="grid gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm dark:border-slate-700 md:grid-cols-[88px_92px_1fr]">
-                <span className="font-mono text-xs text-slate-500">{entry.time}</span>
+              <div key={entry.id} className="grid gap-2 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 text-sm dark:border-[#263247] dark:bg-[#0f172a] md:grid-cols-[88px_92px_1fr]">
+                <span className="font-mono text-xs text-[#71809a] dark:text-slate-500">{entry.time}</span>
                 <span className={`text-xs font-semibold uppercase ${logTone(entry.level)}`}>{entry.level}</span>
-                <span className="text-slate-700 dark:text-slate-200">{entry.message}</span>
+                <span className="text-[#4f5d73] dark:text-slate-200">{entry.message}</span>
               </div>
             ))
           ) : (
@@ -463,22 +515,26 @@ function NumberField({
         disabled={disabled}
         value={value}
         onChange={(event) => onChange(clamp(Number(event.target.value), min, max))}
-        className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:disabled:bg-slate-800"
+        className="mt-2 h-10 w-full rounded-lg border border-[#e6eaf2] bg-white px-3 text-sm text-[#111827] outline-none transition focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] disabled:bg-slate-100 dark:border-[#263247] dark:bg-[#0b1020] dark:text-slate-100 dark:focus:border-violet-400 dark:focus:ring-violet-500/20 dark:disabled:bg-[#182338] dark:disabled:text-slate-500"
       />
     </label>
   );
 }
 
-function Metric({ title, value, icon: Icon, tone }: { title: string; value: string; icon: typeof ServerCog; tone: string }) {
+function Metric({ title, value, icon: Icon, tone, loading = false }: { title: string; value: string; icon: typeof ServerCog; tone: string; loading?: boolean }) {
   return (
     <section className="app-surface rounded-lg p-4">
       <div className="flex items-center justify-between">
         <p className="app-muted text-sm font-medium">{title}</p>
-        <Icon className={`size-5 ${tone}`} />
+        {loading ? <Spinner className={`size-5 ${tone}`} /> : <Icon className={`size-5 ${tone}`} />}
       </div>
       <p className="app-heading mt-3 truncate text-xl font-semibold capitalize">{value}</p>
     </section>
   );
+}
+
+function Spinner({ className = 'size-4' }: { className?: string }) {
+  return <Loader2 className={`animate-spin ${className}`} aria-hidden="true" />;
 }
 
 function DetailBlock({ title, text }: { title: string; text: string }) {
@@ -511,7 +567,7 @@ function severityTone(severity: string) {
     return 'text-amber-600';
   }
   if (severity === 'low') {
-    return 'text-sky-600';
+    return 'text-[#6246ea]';
   }
   return 'text-emerald-600';
 }
@@ -524,7 +580,7 @@ function severityBadge(severity: string) {
     return 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300';
   }
   if (severity === 'low') {
-    return 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300';
+    return 'bg-[#efecff] text-[#4f3ee7] dark:bg-violet-500/15 dark:text-violet-200';
   }
   return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
 }
@@ -539,5 +595,5 @@ function logTone(level: RunLogEntry['level']) {
   if (level === 'success') {
     return 'text-emerald-600';
   }
-  return 'text-blue-600';
+  return 'text-[#6246ea]';
 }
