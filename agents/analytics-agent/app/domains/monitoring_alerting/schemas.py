@@ -22,6 +22,10 @@ class PollRequest(BaseModel):
     log_groups: list[str] = Field(default_factory=list)
 
 
+class LogGroupRequest(BaseModel):
+    log_group: str = Field(min_length=1)
+
+
 class AnalysisFinding(BaseModel):
     severity: str
     title: str

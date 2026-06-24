@@ -141,6 +141,9 @@ export function AppShell({ title, eyebrow = 'Platform summary and key metrics', 
     if (pathname?.startsWith('/analytics/system')) {
       return 'Analytics Agent / Service Analytics';
     }
+    if (pathname?.startsWith('/analytics/monitoring')) {
+      return 'Analytics Agent / Monitoring Control';
+    }
     return 'Overview';
   }, [pathname]);
 
@@ -429,6 +432,7 @@ function titleForPath(pathname: string | null): string {
     const agentKey = pathname.split('/').at(-1);
     return agents.find((agent) => agent.key === agentKey)?.name ?? 'Agent';
   }
+  if (pathname.startsWith('/analytics/monitoring')) return 'Monitoring Control';
   if (pathname.startsWith('/analytics/system')) return 'Service Analytics';
 
   const routeTitle = pathname.split('/').filter(Boolean).at(0) ?? 'Overview';
@@ -496,6 +500,7 @@ function Popover({ title, children }: { title: string; children: ReactNode }) {
 function buildSearchResults(query: string): Array<{ label: string; href: string; type: string }> {
   const items = [
     { label: 'Overview', href: '/', type: 'Page' },
+    { label: 'Monitoring Control', href: '/analytics/monitoring', type: 'Analytics Agent' },
     { label: 'Service Analytics', href: '/analytics/system/rc', type: 'Metrics' },
     { label: 'Workflows', href: '/workflows', type: 'Page' },
     { label: 'Tasks', href: '/tasks', type: 'Page' },

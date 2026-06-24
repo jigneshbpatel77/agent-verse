@@ -13,6 +13,7 @@ import {
   Pause,
   Play,
   Radar,
+  ServerCog,
   ShieldAlert,
   SlidersHorizontal,
   Terminal,
@@ -146,6 +147,14 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {isAnalyticsAgent ? (
+              <Link
+                href="/analytics/monitoring"
+                className="app-button-secondary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
+              >
+                <ServerCog className="size-4" /> Monitoring Control
+              </Link>
+            ) : null}
             {showServiceAnalyticsAction && !isAnalyticsAgent ? (
               <Link
                 href="/analytics/system/rc"

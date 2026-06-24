@@ -8,6 +8,7 @@ from app.domains.monitoring_alerting.llm_analyzer import LLMAnalyzer
 from app.domains.monitoring_alerting.schemas import (
     AnalysisRequest,
     AnalysisResult,
+    LogGroupRequest,
     LogEvent,
     PollRequest,
     PollResult,
@@ -35,6 +36,31 @@ def analyze(request: AnalysisRequest) -> AnalysisResult:
 @router.get("/cloudwatch/log-groups", response_model=list[str])
 def configured_log_groups() -> list[str]:
     settings = get_settings()
+    return settings.cloudwatch_log_groups
+
+
+@router.post("/cloudwatch/log-groups", response_model=list[str])
+def add_log_group(request: LogGroupRequest) -> list[str]:
+    settings = get_settings()
+    log_group = request.log_group.strip()
+    if not log_group:
+        raise HTTPException(status_code=400, detail="Log group cannot be empty")
+
+    if log_group not in settings.cloudwatch_log_groups:
+        settings.cloudwatch_log_groups.append(log_group)
+
+    return settings.cloudwatch_log_groups
+
+
+@router.post("/cloudwatch/log-groups/remove", response_model=list[str])
+def remove_log_group(request: LogGroupRequest) -> list[str]:
+    settings = get_settings()
+    log_group = request.log_group.strip()
+    settings.cloudwatch_log_groups = [
+        configured_group
+        for configured_group in settings.cloudwatch_log_groups
+        if configured_group != log_group
+    ]
     return settings.cloudwatch_log_groups
 
 
