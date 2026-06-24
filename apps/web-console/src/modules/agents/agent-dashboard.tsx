@@ -18,7 +18,7 @@ import {
   Terminal,
   TrendingUp,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { MonitoringAgentControl } from '@/modules/analytics/monitoring-agent-control';
 import { agents, getAgent, summaryTrend } from '@/modules/dashboard/data';
@@ -120,15 +120,59 @@ const analyticsResponsibilities = [
   },
 ];
 
-export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }: { agentKey: string; showServiceAnalyticsAction?: boolean }) {
+const defaultAnalyticsKey = analyticsResponsibilities[0].key;
+const analyticsResponsibilityKeys = new Set(analyticsResponsibilities.map((responsibility) => responsibility.key));
+
+function normalizeAnalyticsKey(key: string | undefined) {
+  return key && analyticsResponsibilityKeys.has(key) ? key : defaultAnalyticsKey;
+}
+
+export function AgentDashboard({
+  agentKey,
+  showServiceAnalyticsAction = false,
+  initialAnalyticsKey,
+}: {
+  agentKey: string;
+  showServiceAnalyticsAction?: boolean;
+  initialAnalyticsKey?: string;
+}) {
   const agent = getAgent(agentKey);
   const Icon = agent.icon;
-  const [isPaused, setIsPaused] = useState(false);
-  const [activeAnalyticsKey, setActiveAnalyticsKey] = useState(analyticsResponsibilities[0].key);
-  const displayStatus = isPaused ? 'Paused' : normalizeAgentStatus(agent.status);
   const isAnalyticsAgent = agentKey === 'analytics';
+  const [isPaused, setIsPaused] = useState(false);
+  const [activeAnalyticsKey, setActiveAnalyticsKey] = useState(() => normalizeAnalyticsKey(initialAnalyticsKey));
+  const displayStatus = isPaused ? 'Paused' : normalizeAgentStatus(agent.status);
   const activeResponsibility =
     analyticsResponsibilities.find((responsibility) => responsibility.key === activeAnalyticsKey) ?? analyticsResponsibilities[0];
+
+  useEffect(() => {
+    if (!isAnalyticsAgent) {
+      return undefined;
+    }
+
+    function syncTabFromUrl() {
+      setActiveAnalyticsKey(normalizeAnalyticsKey(new URLSearchParams(window.location.search).get('tab') ?? undefined));
+    }
+
+    window.addEventListener('popstate', syncTabFromUrl);
+    return () => window.removeEventListener('popstate', syncTabFromUrl);
+  }, [isAnalyticsAgent]);
+
+  function selectAnalyticsTab(key: string) {
+    setActiveAnalyticsKey(key);
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    if (key === defaultAnalyticsKey) {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', key);
+    }
+    window.history.pushState(null, '', url);
+  }
 
   return (
     <div className="space-y-6">
@@ -183,7 +227,7 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
                 key={key}
                 type="button"
                 onClick={() => {
-                  if (isAnalyticsAgent && typeof tab !== 'string') setActiveAnalyticsKey(tab.key);
+                  if (isAnalyticsAgent && typeof tab !== 'string') selectAnalyticsTab(tab.key);
                 }}
                 className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${
                   active
