@@ -1,5 +1,5 @@
-import { SectionPage } from '@/modules/dashboard/section-page';
+import { redirect } from 'next/navigation';
 
 export default function KnowledgePage() {
-  return <SectionPage title="Knowledge Base" />;
+  redirect('/agents/analytics?tab=decision');
 }

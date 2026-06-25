@@ -1,5 +1,5 @@
-import { SectionPage } from '@/modules/dashboard/section-page';
+import { redirect } from 'next/navigation';
 
 export default function IncidentsPage() {
-  return <SectionPage title="Incidents" />;
+  redirect('/agents/analytics?tab=root-cause');
 }

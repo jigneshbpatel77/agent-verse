@@ -1,5 +1,5 @@
-import { SectionPage } from '@/modules/dashboard/section-page';
+import { redirect } from 'next/navigation';
 
 export default function DeploymentsPage() {
-  return <SectionPage title="Deployments" />;
+  redirect('/agents/analytics?tab=optimization');
 }

@@ -4,11 +4,12 @@
   "version": "0.1.0",
   "packageManager": "pnpm@9.12.0",
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
+    "dev": "pnpm --parallel --filter @agent-platform/web-console --filter @agent-platform/api-gateway dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "dev:gateway": "pnpm --filter @agent-platform/api-gateway dev",
+    "dev:analytics": "cd agents/analytics-agent && uvicorn app.main:app --reload --port 8010",
     "dev:web": "pnpm --filter @agent-platform/web-console dev",
     "dev:orchestrator": "pnpm --filter @agent-platform/orchestrator-service dev"
   },

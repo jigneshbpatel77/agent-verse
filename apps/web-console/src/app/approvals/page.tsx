@@ -1,5 +1,5 @@
-import { SectionPage } from '@/modules/dashboard/section-page';
+import { redirect } from 'next/navigation';
 
 export default function ApprovalsPage() {
-  return <SectionPage title="Approvals" />;
+  redirect('/agents/analytics?tab=system');
 }

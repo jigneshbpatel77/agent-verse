@@ -1,5 +1,5 @@
-import { SectionPage } from '@/modules/dashboard/section-page';
+import { redirect } from 'next/navigation';
 
 export default function SettingsPage() {
-  return <SectionPage title="Settings" />;
+  redirect('/agents/analytics?tab=system');
 }

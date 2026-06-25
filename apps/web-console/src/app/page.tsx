@@ -1,5 +1,5 @@
-import { AgentOverview } from '../modules/dashboard/agent-overview';
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-  return <AgentOverview />;
+  redirect('/agents/analytics?tab=system');
 }

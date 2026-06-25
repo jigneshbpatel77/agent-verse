@@ -1,5 +1,5 @@
-import { SectionPage } from '@/modules/dashboard/section-page';
+import { redirect } from 'next/navigation';
 
 export default function AlertsPage() {
-  return <SectionPage title="Alerts" />;
+  redirect('/agents/analytics?tab=monitoring');
 }

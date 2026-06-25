@@ -1,7 +1,11 @@
 import { AgentDashboard } from '@/modules/agents/agent-dashboard';
+import { redirect } from 'next/navigation';
 
 export default async function AgentPage({ params }: { params: Promise<{ agentKey: string }> }) {
   const { agentKey } = await params;
+  if (agentKey !== 'analytics') {
+    redirect('/agents/analytics?tab=system');
+  }
 
-  return <AgentDashboard agentKey={agentKey} showServiceAnalyticsAction={agentKey === 'analytics'} />;
+  return <AgentDashboard agentKey="analytics" />;
 }

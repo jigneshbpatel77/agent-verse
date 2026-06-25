@@ -1,5 +1,5 @@
-import { SectionPage } from '@/modules/dashboard/section-page';
+import { redirect } from 'next/navigation';
 
 export default function TasksPage() {
-  return <SectionPage title="Tasks" />;
+  redirect('/agents/analytics?tab=system');
 }

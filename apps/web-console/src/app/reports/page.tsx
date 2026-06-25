@@ -1,5 +1,5 @@
-import { SectionPage } from '@/modules/dashboard/section-page';
+import { redirect } from 'next/navigation';
 
 export default function ReportsPage() {
-  return <SectionPage title="Reports" />;
+  redirect('/agents/analytics?tab=business');
 }

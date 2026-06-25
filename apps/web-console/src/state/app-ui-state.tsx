@@ -3,10 +3,8 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 type AppUiState = {
-  agentsOpen: boolean;
   collapsed: boolean;
   darkMode: boolean;
-  setAgentsOpen: (value: boolean | ((current: boolean) => boolean)) => void;
   setCollapsed: (value: boolean | ((current: boolean) => boolean)) => void;
   setDarkMode: (value: boolean | ((current: boolean) => boolean)) => void;
 };
@@ -25,7 +23,6 @@ const defaultAnalyticsTab = 'system';
 
 export function ShellUiStateProvider({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsedState] = usePersistentState('agentverse:sidebar-collapsed', false);
-  const [agentsOpen, setAgentsOpenState] = usePersistentState('agentverse:agents-open', true);
   const [darkMode, setDarkModeState] = usePersistentState('agentverse:dark-mode', false);
 
   useEffect(() => {
@@ -34,18 +31,14 @@ export function ShellUiStateProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AppUiState>(
     () => ({
-      agentsOpen,
       collapsed,
       darkMode,
-      setAgentsOpen: setAgentsOpenState,
       setCollapsed: setCollapsedState,
       setDarkMode: setDarkModeState,
     }),
     [
-      agentsOpen,
       collapsed,
       darkMode,
-      setAgentsOpenState,
       setCollapsedState,
       setDarkModeState,
     ],
