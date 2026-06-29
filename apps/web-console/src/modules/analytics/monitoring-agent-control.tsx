@@ -61,6 +61,9 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
   const [removingLogGroup, setRemovingLogGroup] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
   const stopRequestedRef = useRef(false);
+  const modeTabListRef = useRef<HTMLDivElement | null>(null);
+  const modeTabRefs = useRef<Record<RunMode, HTMLButtonElement | null>>({ continuous: null, iterations: null });
+  const [modeIndicator, setModeIndicator] = useState({ left: 0, top: 0, width: 0, height: 0, ready: false });
 
   const selectedCount = selectedLogGroups.length;
   const findings = lastResult?.analysis?.findings ?? [];
@@ -114,6 +117,43 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
       cancelled = true;
     };
   }, [addLog]);
+
+  useEffect(() => {
+    function updateModeIndicator() {
+      const activeTab = modeTabRefs.current[runMode];
+      const tabList = modeTabListRef.current;
+
+      if (!activeTab || !tabList) {
+        return;
+      }
+
+      setModeIndicator({
+        left: activeTab.offsetLeft,
+        top: activeTab.offsetTop,
+        width: activeTab.offsetWidth,
+        height: activeTab.offsetHeight,
+        ready: true,
+      });
+    }
+
+    updateModeIndicator();
+    const animationFrameId = window.requestAnimationFrame(updateModeIndicator);
+    const resizeObserver = new ResizeObserver(updateModeIndicator);
+    if (modeTabListRef.current) {
+      resizeObserver.observe(modeTabListRef.current);
+    }
+    const activeTab = modeTabRefs.current[runMode];
+    if (activeTab) {
+      resizeObserver.observe(activeTab);
+    }
+    window.addEventListener('resize', updateModeIndicator);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateModeIndicator);
+    };
+  }, [runMode]);
 
   const canStart = runState === 'idle' && selectedCount > 0 && !logGroupsLoading;
   const progressLabel = useMemo(() => {
@@ -331,15 +371,30 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             <div>
               <label className="app-muted-strong text-sm font-semibold">Mode</label>
-              <div className="mt-2 grid grid-cols-2 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-1 dark:border-[#263247] dark:bg-[#0b1020]">
+              <div ref={modeTabListRef} className="relative mt-2 grid grid-cols-2 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-1 dark:border-[#263247] dark:bg-[#0b1020]">
+                <span
+                  aria-hidden="true"
+                  className={`absolute rounded-md bg-[#efecff] transition-[left,top,width,height,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[left,top,width,height] dark:bg-violet-500/20 ${
+                    modeIndicator.ready ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  style={{
+                    left: modeIndicator.left,
+                    top: modeIndicator.top,
+                    width: modeIndicator.width,
+                    height: modeIndicator.height,
+                  }}
+                />
                 {(['continuous', 'iterations'] as const).map((mode) => (
                   <button
                     key={mode}
+                    ref={(node) => {
+                      modeTabRefs.current[mode] = node;
+                    }}
                     type="button"
                     onClick={() => setRunMode(mode)}
-                    className={`h-9 rounded-md px-3 text-sm font-semibold capitalize smooth-transition ${
+                    className={`relative z-10 h-9 rounded-md px-3 text-sm font-semibold capitalize smooth-transition ${
                       runMode === mode
-                        ? 'bg-[#efecff] text-[#4f3ee7] dark:bg-violet-500/20 dark:text-violet-200'
+                        ? 'text-[#4f3ee7] dark:text-violet-200'
                         : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
                     }`}
                   >
