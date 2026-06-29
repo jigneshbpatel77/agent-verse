@@ -1,8 +1,12 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode
+
+AGENT_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 class Settings(BaseSettings):
@@ -96,7 +100,10 @@ class Settings(BaseSettings):
         default=20, alias="FIREBASE_REQUEST_TIMEOUT_SECONDS", ge=1
     )
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = {
+        "env_file": (REPO_ROOT / ".env", AGENT_ROOT / ".env"),
+        "extra": "ignore",
+    }
 
     @field_validator("cloudwatch_log_groups", mode="before")
     @classmethod

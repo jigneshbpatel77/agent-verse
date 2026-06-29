@@ -291,7 +291,7 @@ class FirebaseService:
             from google.oauth2 import service_account
         except ImportError as exc:
             raise FirebaseConfigError(
-                "google-auth is required. Install dependencies with `python -m pip install -e .`."
+                "Firebase connector dependencies are not installed. Run `python3 -m pip install -e agents/analytics-agent` from the repository root."
             ) from exc
 
         expanded_path = Path(credentials_path).expanduser()

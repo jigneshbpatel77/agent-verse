@@ -69,6 +69,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
   const findings = lastResult?.analysis?.findings ?? [];
   const latestFinding = findings[0];
   const highestSeverity = lastResult?.analysis?.highest_severity ?? 'none';
+  const hasConfiguredLogGroups = configuredLogGroups.length > 0;
   const runStatusText = runState === 'idle' ? 'Idle' : runState === 'running' ? 'Running' : 'Stopping';
   const eventsAnalyzedLabel = lastResult ? `${lastResult.event_count} event${lastResult.event_count === 1 ? '' : 's'}` : 'Awaiting scan';
   const severityLabel = lastResult ? severityDisplay(highestSeverity) : 'Not checked';
@@ -119,6 +120,11 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
   }, [addLog]);
 
   useEffect(() => {
+    if (!hasConfiguredLogGroups) {
+      setModeIndicator((current) => ({ ...current, ready: false }));
+      return;
+    }
+
     function updateModeIndicator() {
       const activeTab = modeTabRefs.current[runMode];
       const tabList = modeTabListRef.current;
@@ -137,7 +143,11 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
     }
 
     updateModeIndicator();
-    const animationFrameId = window.requestAnimationFrame(updateModeIndicator);
+    let nextAnimationFrameId: number | null = null;
+    const animationFrameId = window.requestAnimationFrame(() => {
+      updateModeIndicator();
+      nextAnimationFrameId = window.requestAnimationFrame(updateModeIndicator);
+    });
     const resizeObserver = new ResizeObserver(updateModeIndicator);
     if (modeTabListRef.current) {
       resizeObserver.observe(modeTabListRef.current);
@@ -150,10 +160,13 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
 
     return () => {
       window.cancelAnimationFrame(animationFrameId);
+      if (nextAnimationFrameId !== null) {
+        window.cancelAnimationFrame(nextAnimationFrameId);
+      }
       resizeObserver.disconnect();
       window.removeEventListener('resize', updateModeIndicator);
     };
-  }, [runMode]);
+  }, [hasConfiguredLogGroups, runMode]);
 
   const canStart = runState === 'idle' && selectedCount > 0 && !logGroupsLoading;
   const progressLabel = useMemo(() => {
@@ -305,58 +318,137 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
-            <span className={`inline-flex h-9 items-center justify-center rounded-lg px-3 text-sm font-semibold ${runStateBadge(runState)}`}>
-              {polling ? <Spinner className="mr-2 size-4" /> : null}
-              {runStatusText}
-            </span>
-            <span className="inline-flex h-9 items-center justify-center rounded-lg border border-[#e6eaf2] px-3 text-sm font-semibold text-[#4f5d73] dark:border-[#263247] dark:text-slate-300">
-              {selectedCount}/{configuredLogGroups.length} groups
-            </span>
-            <div className="inline-flex h-9 overflow-hidden rounded-lg border border-[#e6eaf2] bg-white dark:border-[#263247] dark:bg-[#0b1020]">
-              {runState === 'idle' ? (
+          {hasConfiguredLogGroups ? (
+            <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
+              <span className={`inline-flex h-9 items-center justify-center rounded-lg px-3 text-sm font-semibold ${runStateBadge(runState)}`}>
+                {polling ? <Spinner className="mr-2 size-4" /> : null}
+                {runStatusText}
+              </span>
+              <span className="inline-flex h-9 items-center justify-center rounded-lg border border-[#e6eaf2] px-3 text-sm font-semibold text-[#4f5d73] dark:border-[#263247] dark:text-slate-300">
+                {selectedCount}/{configuredLogGroups.length} groups
+              </span>
+              <div className="inline-flex h-9 overflow-hidden rounded-lg border border-[#e6eaf2] bg-white dark:border-[#263247] dark:bg-[#0b1020]">
+                {runState === 'idle' ? (
+                  <button
+                    type="button"
+                    disabled={!canStart}
+                    onClick={() => void startRun()}
+                    className="app-button-primary inline-flex min-w-24 items-center justify-center gap-2 px-3 text-sm font-semibold disabled:cursor-not-allowed"
+                  >
+                    <Play className="size-4" />
+                    Start
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={stopRun}
+                    className="inline-flex min-w-24 items-center justify-center gap-2 bg-rose-500/10 px-3 text-sm font-semibold text-rose-600 smooth-transition hover:bg-rose-500/15 dark:text-rose-300"
+                  >
+                    <Square className="size-4" />
+                    {runState === 'stopping' ? 'Stopping' : 'Stop'}
+                  </button>
+                )}
                 <button
                   type="button"
-                  disabled={!canStart}
-                  onClick={() => void startRun()}
-                  className="app-button-primary inline-flex min-w-24 items-center justify-center gap-2 px-3 text-sm font-semibold disabled:cursor-not-allowed"
+                  onClick={resetRunLog}
+                  className="inline-flex items-center justify-center border-l border-[#e6eaf2] px-3 text-sm font-semibold text-[#4f5d73] smooth-transition hover:bg-[#f8faff] dark:border-[#263247] dark:text-slate-300 dark:hover:bg-[#182338]"
+                  aria-label="Reset monitoring run"
                 >
-                  <Play className="size-4" />
-                  Start
+                  <RotateCcw className="size-4" />
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={stopRun}
-                  className="inline-flex min-w-24 items-center justify-center gap-2 bg-rose-500/10 px-3 text-sm font-semibold text-rose-600 smooth-transition hover:bg-rose-500/15 dark:text-rose-300"
-                >
-                  <Square className="size-4" />
-                  {runState === 'stopping' ? 'Stopping' : 'Stop'}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={resetRunLog}
-                className="inline-flex items-center justify-center border-l border-[#e6eaf2] px-3 text-sm font-semibold text-[#4f5d73] smooth-transition hover:bg-[#f8faff] dark:border-[#263247] dark:text-slate-300 dark:hover:bg-[#182338]"
-                aria-label="Reset monitoring run"
-              >
-                <RotateCcw className="size-4" />
-              </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <span
+              className={`inline-flex w-fit shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${
+                logGroupsLoading
+                  ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                  : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+              }`}
+            >
+              {logGroupsLoading ? <Spinner className="size-4" /> : null}
+              {logGroupsLoading ? 'Loading' : 'Setup required'}
+            </span>
+          )}
         </div>
 
+        {!logGroupsLoading && !hasConfiguredLogGroups ? (
+          <div className="mx-5 mb-5 grid gap-5 rounded-lg bg-slate-50/80 p-4 ring-1 ring-slate-200/80 dark:bg-slate-950/30 dark:ring-slate-700/60 xl:grid-cols-[minmax(0,0.95fr)_minmax(320px,0.75fr)]">
+            <div className="flex gap-3">
+              <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-300">
+                <AlertTriangle className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="app-heading text-lg font-semibold">Configure CloudWatch before scans run</h2>
+                <p className="app-muted mt-1 max-w-2xl text-sm leading-6">
+                  Add at least one CloudWatch log group, then start a scan to review events and alert-ready findings.
+                </p>
+
+                <div className="mt-4 flex gap-2">
+                  <input
+                    type="text"
+                    value={newLogGroup}
+                    onChange={(event) => setNewLogGroup(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        void addLogGroup();
+                      }
+                    }}
+                    placeholder="/aws/lambda/service-name"
+                    className="h-10 min-w-0 flex-1 rounded-lg border border-[#e6eaf2] bg-white px-3 font-mono text-xs text-[#111827] outline-none smooth-transition focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] dark:border-[#263247] dark:bg-[#0b1020] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-violet-400 dark:focus:ring-violet-500/20"
+                  />
+                  <button
+                    type="button"
+                    disabled={addingLogGroup || !newLogGroup.trim()}
+                    onClick={() => void addLogGroup()}
+                    className="app-button-primary inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold disabled:cursor-not-allowed"
+                  >
+                    {addingLogGroup ? <Spinner className="size-4" /> : <Plus className="size-4" />}
+                    Add
+                  </button>
+                </div>
+
+                <code className="mt-3 block overflow-x-auto rounded-md bg-white px-3 py-2 font-mono text-xs font-semibold text-[#4f46e5] ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-violet-200 dark:ring-slate-700/70">
+                  CLOUDWATCH_LOG_GROUPS=/aws/lambda/service-name
+                </code>
+              </div>
+            </div>
+
+            <div className="grid content-start gap-2 text-sm">
+              {[
+                'Install analytics-agent dependencies',
+                'Set AWS_REGION and AWS credentials or an instance/task role',
+                'Add CLOUDWATCH_LOG_GROUPS in agents/analytics-agent/.env',
+                'Restart analytics-agent and run a scan',
+              ].map((item, index) => (
+                <div key={item} className="flex items-center gap-3 rounded-md bg-white/70 px-3 py-2 text-[#4f5d73] ring-1 ring-slate-200/70 dark:bg-slate-900/50 dark:text-slate-300 dark:ring-slate-700/50">
+                  <span
+                    className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${
+                      index === 2 ? 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
+                  <span className="font-semibold">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <HeaderStat title="Progress" value={progressLabel} />
-        <HeaderStat title="Events analyzed" value={eventsAnalyzedLabel} />
-        <HeaderStat title="Highest severity" value={severityLabel} tone={lastResult ? severityTone(highestSeverity) : 'text-[#71809a] dark:text-slate-400'} />
-        <HeaderStat title="Findings" value={findingsLabel} />
-      </section>
+      {hasConfiguredLogGroups ? (
+        <>
+          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <HeaderStat title="Progress" value={progressLabel} />
+            <HeaderStat title="Events analyzed" value={eventsAnalyzedLabel} />
+            <HeaderStat title="Highest severity" value={severityLabel} tone={lastResult ? severityTone(highestSeverity) : 'text-[#71809a] dark:text-slate-400'} />
+            <HeaderStat title="Findings" value={findingsLabel} />
+          </section>
 
-      <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
-        <section className="app-surface card-smooth rounded-lg p-5">
+          <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
+            <section className="app-surface card-smooth rounded-lg p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="app-heading text-lg font-semibold">Run Setup</h2>
@@ -490,9 +582,9 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
               )}
             </div>
           </div>
-        </section>
+            </section>
 
-        <section className="app-surface card-smooth rounded-lg p-5">
+            <section className="app-surface card-smooth rounded-lg p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="app-heading text-lg font-semibold">Latest Analysis</h2>
@@ -552,33 +644,35 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
               </div>
             </div>
           )}
-        </section>
-      </section>
+            </section>
+          </section>
 
-      <section className="app-surface card-smooth rounded-lg p-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="app-heading text-lg font-semibold">Activity Stream</h2>
-            <p className="app-muted mt-1 text-sm">Recent monitoring run events.</p>
-          </div>
-          <span className="app-muted text-sm font-semibold">{runLog.length} entries</span>
-        </div>
-        <div className="mt-4 grid gap-2 lg:grid-cols-2">
-          {runLog.length ? (
-            runLog.slice(0, 8).map((entry) => (
-              <div key={entry.id} className="card-smooth grid gap-2 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 text-sm dark:border-[#263247] dark:bg-[#0f172a] md:grid-cols-[76px_74px_1fr]">
-                <span className="font-mono text-xs text-[#71809a] dark:text-slate-500">{entry.time}</span>
-                <span className={`text-xs font-semibold uppercase ${logTone(entry.level)}`}>{entry.level}</span>
-                <span className="min-w-0 text-[#4f5d73] dark:text-slate-200">{entry.message}</span>
+          <section className="app-surface card-smooth rounded-lg p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="app-heading text-lg font-semibold">Activity Stream</h2>
+                <p className="app-muted mt-1 text-sm">Recent monitoring run events.</p>
               </div>
-            ))
-          ) : (
-            <div className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-3 text-sm text-[#71809a] dark:border-[#263247] dark:bg-[#0f172a] dark:text-slate-400">
-              No run activity yet.
+              <span className="app-muted text-sm font-semibold">{runLog.length} entries</span>
             </div>
-          )}
-        </div>
-      </section>
+            <div className="mt-4 grid gap-2 lg:grid-cols-2">
+              {runLog.length ? (
+                runLog.slice(0, 8).map((entry) => (
+                  <div key={entry.id} className="card-smooth grid gap-2 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 text-sm dark:border-[#263247] dark:bg-[#0f172a] md:grid-cols-[76px_74px_1fr]">
+                    <span className="font-mono text-xs text-[#71809a] dark:text-slate-500">{entry.time}</span>
+                    <span className={`text-xs font-semibold uppercase ${logTone(entry.level)}`}>{entry.level}</span>
+                    <span className="min-w-0 text-[#4f5d73] dark:text-slate-200">{entry.message}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-3 text-sm text-[#71809a] dark:border-[#263247] dark:bg-[#0f172a] dark:text-slate-400">
+                  No run activity yet.
+                </div>
+              )}
+            </div>
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Activity,
   AlertCircle,
@@ -659,11 +660,33 @@ function FirebaseSignalsPanel() {
   const engagementComparison = firebaseYesterdayComparison(overview, 'userEngagementDuration');
   const reportsCount = overview?.crashlytics?.reports.length ?? 0;
   const missing = overview?.config.missing ?? [];
+  const firebaseErrors = overview?.errors ?? [];
   const breakdowns = overview?.analytics?.breakdowns ?? [];
+  const setupMessages = firebaseSetupMessages({ missing, errors: firebaseErrors, error });
+  const warningMessages = firebaseWarningMessages(firebaseErrors);
+  const needsSetup = setupMessages.length > 0;
+  const hasPartialWarning = !needsSetup && warningMessages.length > 0;
+  const needsDependencyInstall = setupMessages.some((message) => message.toLowerCase().includes('dependencies'));
+  const primaryMetrics = [
+    { label: 'Active users', value: formatFirebaseNumber(activeUsers), icon: Activity, comparison: activeUsersComparison },
+    { label: 'Sessions', value: formatFirebaseNumber(sessions), icon: Gauge, comparison: sessionsComparison },
+    { label: 'Screen views', value: formatFirebaseNumber(views), icon: FileText, comparison: viewsComparison },
+    {
+      label: 'Crash reports',
+      value: overview?.crashlytics ? String(reportsCount) : '--',
+      icon: AlertTriangle,
+      help: overview?.crashlytics ? undefined : 'Crashlytics API not connected',
+    },
+  ];
+  const secondaryMetrics = [
+    { label: 'New users', value: formatFirebaseNumber(newUsers), comparison: newUsersComparison },
+    { label: 'Events', value: formatFirebaseNumber(events), comparison: eventsComparison },
+    { label: 'Engagement sec', value: formatFirebaseNumber(engagement), comparison: engagementComparison },
+  ];
 
   return (
-    <section className="app-surface rounded-lg p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="app-surface overflow-hidden rounded-lg">
+      <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex gap-4">
           <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300">
             <Database className="size-6" />
@@ -677,55 +700,122 @@ function FirebaseSignalsPanel() {
           className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${
             loading
               ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-              : missing.length || overview?.errors.length || error
+              : needsSetup
                 ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-                : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                : hasPartialWarning
+                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                  : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
           }`}
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : null}
-          {loading ? 'Loading' : missing.length || overview?.errors.length || error ? 'Setup needed' : 'Live'}
+          {loading ? 'Loading' : needsSetup ? 'Setup required' : hasPartialWarning ? 'Partial live' : 'Live'}
         </span>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <FirebaseMetricCard label="Active users" value={formatFirebaseNumber(activeUsers)} icon={Activity} comparison={activeUsersComparison} />
-        <FirebaseMetricCard label="New users" value={formatFirebaseNumber(newUsers)} icon={TrendingUp} comparison={newUsersComparison} />
-        <FirebaseMetricCard label="Sessions" value={formatFirebaseNumber(sessions)} icon={Gauge} comparison={sessionsComparison} />
-        <FirebaseMetricCard label="Screen views" value={formatFirebaseNumber(views)} icon={FileText} comparison={viewsComparison} />
-        <FirebaseMetricCard label="Events" value={formatFirebaseNumber(events)} icon={BarChart3} comparison={eventsComparison} />
-        <FirebaseMetricCard label="Engagement sec" value={formatFirebaseNumber(engagement)} icon={Clock3} comparison={engagementComparison} />
-        <FirebaseMetricCard label="Crash reports" value={String(reportsCount)} icon={AlertTriangle} />
-      </div>
-
-      {breakdowns.length ? (
-        <div className="mt-5 grid gap-4 xl:grid-cols-2">
-          {breakdowns.map((breakdown) => (
-            <FirebaseBreakdownTable key={breakdown.name} breakdown={breakdown} />
-          ))}
+      {needsSetup ? (
+        <div className="mx-5 mb-5 grid gap-4 rounded-lg bg-slate-50/80 p-4 ring-1 ring-slate-200/80 dark:bg-slate-950/30 dark:ring-slate-700/60 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
+          <div className="flex gap-3">
+            <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-300">
+              <AlertCircle className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="app-heading font-semibold">Connect Firebase before metrics appear</p>
+              <p className="app-muted mt-1 text-sm">{setupMessages[0]}</p>
+              {needsDependencyInstall ? (
+                <code className="mt-3 block overflow-x-auto rounded-md bg-white px-3 py-2 font-mono text-xs font-semibold text-[#4f46e5] ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-violet-200 dark:ring-slate-700/70">
+                  python3 -m pip install -e agents/analytics-agent
+                </code>
+              ) : null}
+            </div>
+          </div>
+          <div className="grid gap-2 text-sm">
+            {['Install Firebase dependencies', 'Configure Firebase env values', 'Restart analytics-agent'].map((item, index) => (
+              <div key={item} className="flex items-center gap-3 rounded-md bg-white/70 px-3 py-2 text-[#4f5d73] ring-1 ring-slate-200/70 dark:bg-slate-900/50 dark:text-slate-300 dark:ring-slate-700/50">
+                <span
+                  className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${
+                    index === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                  }`}
+                >
+                  {index + 1}
+                </span>
+                <span className="font-semibold">{item}</span>
+              </div>
+            ))}
+          </div>
+          {setupMessages.length > 1 ? (
+            <div className="lg:col-span-2 flex flex-wrap gap-2">
+              {setupMessages.slice(1).map((message) => (
+                <span key={message} className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold text-[#66758f] ring-1 ring-slate-200/70 dark:bg-slate-900/50 dark:text-slate-300 dark:ring-slate-700/50">
+                  {message}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      ) : (
+        <div className="border-t border-[#e6eaf2] p-5 dark:border-[#263247]">
+          <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+            {primaryMetrics.map((metric) => (
+              <FirebaseMetricCard
+                key={metric.label}
+                label={metric.label}
+                value={metric.value}
+                icon={metric.icon}
+                comparison={metric.comparison}
+                help={metric.help}
+              />
+            ))}
+          </div>
 
-      {error ? (
-        <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
-          {error}
-        </div>
-      ) : null}
+          <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.42fr)]">
+            <article className="app-surface-subtle rounded-lg p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="app-heading text-sm font-semibold">Signal health</h3>
+                  <p className="app-muted mt-1 text-xs">
+                    {hasPartialWarning ? 'GA4 is live. One Firebase signal needs attention.' : 'GA4 and configured Firebase signals are reachable.'}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <span
+                    className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      hasPartialWarning
+                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                        : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                    }`}
+                  >
+                    {hasPartialWarning ? 'Action needed' : 'Healthy'}
+                  </span>
+                  <span className="app-muted text-xs font-semibold">
+                    {primaryMetrics.filter((metric) => metric.value !== '--').length + secondaryMetrics.filter((metric) => metric.value !== '--').length} live signals
+                  </span>
+                </div>
+              </div>
 
-      {missing.length ? (
-        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-          Add these backend env values to fetch Firebase data: {missing.join(', ')}.
-        </div>
-      ) : null}
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {secondaryMetrics.map((metric) => (
+                  <FirebaseMiniStat key={metric.label} label={metric.label} value={metric.value} comparison={metric.comparison} />
+                ))}
+              </div>
+            </article>
 
-      {overview?.errors.length ? (
-        <div className="mt-4 space-y-2">
-          {overview.errors.map((item) => (
-            <p key={item} className="rounded-lg border border-amber-200 bg-white p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-slate-900 dark:text-amber-300">
-              {item}
-            </p>
-          ))}
+            {hasPartialWarning ? (
+              <div className="rounded-lg bg-amber-50/80 p-3 text-sm text-amber-900 ring-1 ring-amber-200/70 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-400/15">
+                <p className="font-semibold">Firebase partial connection</p>
+                <p className="mt-1 text-xs leading-5 text-amber-800/80 dark:text-amber-100/75">{warningMessages[0]}</p>
+              </div>
+            ) : (
+              <article className="app-surface-subtle rounded-lg p-4">
+                <p className="app-muted text-xs font-semibold uppercase">Connector status</p>
+                <p className="app-heading mt-2 text-sm font-semibold">GA4 stream active</p>
+                <p className="app-muted mt-1 text-xs leading-5">Crashlytics data appears when the Firebase API returns reports for this app.</p>
+              </article>
+            )}
+          </div>
+
+          {breakdowns.length ? <FirebaseBreakdownSummary breakdowns={breakdowns} /> : null}
         </div>
-      ) : null}
+      )}
     </section>
   );
 }
@@ -735,34 +825,170 @@ function FirebaseMetricCard({
   value,
   icon: Icon,
   comparison,
+  help,
 }: {
   label: string;
   value: string;
   icon: typeof Activity;
   comparison?: FirebaseMetricComparison | null;
+  help?: string;
 }) {
+  const trendPercent = comparison ? formatFirebaseTrendPercent(comparison) : null;
+
   return (
     <article className="app-surface-subtle rounded-lg p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="app-muted text-sm font-semibold">{label}</p>
-        <Icon className="size-4 text-sky-600 dark:text-sky-300" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="app-muted truncate text-sm font-semibold">{label}</p>
+          <p className="app-heading mt-3 text-2xl font-semibold leading-none">
+            <FirebaseNumberText value={value} />
+          </p>
+        </div>
+        <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-950/30 dark:text-sky-300">
+          <Icon className="size-4" />
+        </div>
       </div>
-      <p className="app-heading mt-3 text-xl font-semibold">{value}</p>
       {comparison ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-4 grid grid-cols-3 gap-2 rounded-lg bg-white/60 p-2 ring-1 ring-[#e6eaf2]/70 dark:bg-slate-950/25 dark:ring-[#263247]/80">
+          <FirebaseMetricDetail label="Yesterday" value={formatFirebaseNumber(comparison.yesterday)} />
+          <FirebaseMetricDetail
+            label="Change"
+            value={formatFirebaseNumber(comparison.delta)}
+            prefix={comparison.delta >= 0 ? '+' : ''}
+            tone={comparison.delta >= 0 ? 'positive' : 'negative'}
+          />
+          <FirebaseMetricDetail
+            label="Trend"
+            value={trendPercent ?? '--'}
+            tone={comparison.delta >= 0 ? 'positive' : 'negative'}
+            isText
+          />
+        </div>
+      ) : help ? (
+        <p className="app-muted mt-4 rounded-lg bg-white/60 px-3 py-2 text-xs ring-1 ring-[#e6eaf2]/70 dark:bg-slate-950/25 dark:ring-[#263247]/80">{help}</p>
+      ) : null}
+    </article>
+  );
+}
+
+function FirebaseMetricDetail({
+  label,
+  value,
+  prefix = '',
+  tone = 'muted',
+  isText = false,
+}: {
+  label: string;
+  value: string;
+  prefix?: string;
+  tone?: 'muted' | 'positive' | 'negative';
+  isText?: boolean;
+}) {
+  const toneClass =
+    tone === 'positive'
+      ? 'text-emerald-700 dark:text-emerald-300'
+      : tone === 'negative'
+        ? 'text-rose-700 dark:text-rose-300'
+        : 'text-[#111827] dark:text-slate-100';
+
+  return (
+    <div className="min-w-0">
+      <p className="app-muted truncate text-[10px] font-semibold uppercase tracking-wide">{label}</p>
+      <p className={`mt-1 truncate text-xs font-semibold ${toneClass}`}>
+        {isText ? value : <FirebaseNumberText value={value} prefix={prefix} />}
+      </p>
+    </div>
+  );
+}
+
+function FirebaseMiniStat({
+  label,
+  value,
+  comparison,
+}: {
+  label: string;
+  value: string;
+  comparison?: FirebaseMetricComparison | null;
+}) {
+  const trendPercent = comparison ? formatFirebaseTrendPercent(comparison) : null;
+
+  return (
+    <div className="rounded-lg bg-white/70 p-3 ring-1 ring-[#e6eaf2] dark:bg-slate-950/30 dark:ring-[#263247]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="app-muted truncate text-xs font-semibold uppercase">{label}</p>
+          <p className="app-heading mt-2 text-lg font-semibold leading-none">
+            <FirebaseNumberText value={value} />
+          </p>
+        </div>
+        {trendPercent ? (
           <span
-            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-              comparison.delta >= 0
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              comparison && comparison.delta >= 0
                 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
                 : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
             }`}
           >
-            {comparison.delta >= 0 ? '+' : ''}
-            {formatFirebaseNumber(comparison.delta)}
+            {trendPercent}
           </span>
-          <span className="app-muted text-xs">vs yesterday {formatFirebaseNumber(comparison.yesterday)}</span>
-        </div>
+        ) : null}
+      </div>
+      {comparison ? (
+        <p className="app-muted mt-2 truncate text-xs">
+          <FirebaseNumberText value={formatFirebaseNumber(comparison.delta)} prefix={comparison.delta >= 0 ? '+' : ''} /> vs yesterday
+        </p>
       ) : null}
+    </div>
+  );
+}
+
+function FirebaseBreakdownSummary({
+  breakdowns,
+}: {
+  breakdowns: NonNullable<FirebaseOverviewResponse['analytics']>['breakdowns'];
+}) {
+  return (
+    <article className="app-surface-subtle mt-4 rounded-lg p-4">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="app-heading text-sm font-semibold">App signal breakdown</h3>
+          <p className="app-muted text-xs">Top events, screens, app versions, and operating systems in one compact view.</p>
+        </div>
+        <span className="app-muted text-xs font-semibold">{breakdowns.length} dimensions</span>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+        {breakdowns.slice(0, 4).map((breakdown) => {
+          const primaryMetric = preferredFirebaseMetric(breakdown);
+          return (
+            <div key={breakdown.name} className="rounded-lg bg-white/70 p-3 ring-1 ring-[#e6eaf2] dark:bg-slate-950/30 dark:ring-[#263247]">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[#111827] dark:text-slate-100">{breakdown.name}</p>
+                  <p className="app-muted mt-0.5 truncate text-xs">{formatFirebaseMetricLabel(primaryMetric)}</p>
+                </div>
+                <span className="app-muted shrink-0 text-xs">
+                  Top {Math.min(3, breakdown.rows.length)} of {breakdown.rows.length}
+                </span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {breakdown.rows.length ? (
+                  breakdown.rows.slice(0, 3).map((row) => (
+                    <div key={`${breakdown.name}-${row.dimension}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs">
+                      <span className="truncate font-medium text-[#4f5d73] dark:text-slate-300">{row.dimension || '(not set)'}</span>
+                      <span className="font-mono font-semibold text-[#111827] dark:text-slate-100">
+                        <FirebaseNumberText value={formatFirebaseNumber(row.metrics[primaryMetric] ?? null)} />
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="app-muted text-xs">No rows returned.</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </article>
   );
 }
@@ -790,11 +1016,11 @@ function FirebaseBreakdownTable({
             <div key={`${breakdown.name}-${row.dimension}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md bg-white px-3 py-2 text-sm dark:bg-slate-950/40">
               <span className="truncate font-medium text-[#111827] dark:text-slate-100">{row.dimension || '(not set)'}</span>
               <span className="font-mono text-xs font-semibold text-[#4f5d73] dark:text-slate-300">
-                {formatFirebaseNumber(row.metrics[primaryMetric] ?? null)}
+                <FirebaseNumberText value={formatFirebaseNumber(row.metrics[primaryMetric] ?? null)} />
               </span>
               {secondaryMetric ? (
                 <span className="font-mono text-xs text-[#71809a] dark:text-slate-400">
-                  {formatFirebaseNumber(row.metrics[secondaryMetric] ?? null)}
+                  <FirebaseNumberText value={formatFirebaseNumber(row.metrics[secondaryMetric] ?? null)} />
                 </span>
               ) : null}
             </div>
@@ -871,11 +1097,242 @@ function formatFirebaseMetricLabel(metric: string) {
   return labels[metric] ?? metric;
 }
 
+function formatFirebaseTrendPercent(comparison: FirebaseMetricComparison) {
+  if (comparison.yesterday === 0) {
+    return comparison.delta === 0 ? '0%' : comparison.delta > 0 ? '+100%' : '-100%';
+  }
+
+  const percent = (comparison.delta / comparison.yesterday) * 100;
+  return `${percent >= 0 ? '+' : ''}${new Intl.NumberFormat('en-IN', {
+    maximumFractionDigits: Math.abs(percent) < 10 ? 1 : 0,
+  }).format(percent)}%`;
+}
+
 function formatFirebaseNumber(value: number | null) {
   if (value === null) {
-    return 'N/A';
+    return '--';
   }
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value);
+}
+
+function FirebaseNumberText({
+  value,
+  prefix = '',
+}: {
+  value: string;
+  prefix?: string;
+}) {
+  const triggerRef = useRef<HTMLSpanElement | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{
+    left: number;
+    top: number;
+    placement: 'top' | 'bottom';
+  } | null>(null);
+  const numericValue = parseFirebaseNumber(value);
+  const tooltip =
+    numericValue !== null && Math.abs(numericValue) >= 100000
+      ? indianNumberToWords(numericValue)
+      : null;
+  const updateTooltipPosition = useCallback(() => {
+    const element = triggerRef.current;
+    if (!element) {
+      return;
+    }
+
+    const rect = element.getBoundingClientRect();
+    const tooltipHalfWidth = Math.min(176, Math.max(120, (window.innerWidth - 24) / 2));
+    const centeredLeft = rect.left + rect.width / 2;
+    const left = Math.min(Math.max(centeredLeft, tooltipHalfWidth + 12), window.innerWidth - tooltipHalfWidth - 12);
+    const hasTopSpace = rect.top > 72;
+
+    setTooltipPosition({
+      left,
+      top: hasTopSpace ? rect.top - 10 : rect.bottom + 10,
+      placement: hasTopSpace ? 'top' : 'bottom',
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!tooltipPosition) {
+      return;
+    }
+
+    window.addEventListener('resize', updateTooltipPosition);
+    window.addEventListener('scroll', updateTooltipPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateTooltipPosition);
+      window.removeEventListener('scroll', updateTooltipPosition, true);
+    };
+  }, [tooltipPosition, updateTooltipPosition]);
+
+  if (!tooltip) {
+    return (
+      <>
+        {prefix}
+        {value}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        className="cursor-help rounded-sm outline-none transition-colors duration-200 ease-out hover:text-violet-700 focus-visible:text-violet-700 focus-visible:ring-2 focus-visible:ring-violet-500/40 dark:hover:text-violet-200 dark:focus-visible:text-violet-200"
+        tabIndex={0}
+        aria-label={`${prefix}${value}: ${tooltip}`}
+        onBlur={() => setTooltipPosition(null)}
+        onFocus={updateTooltipPosition}
+        onMouseEnter={updateTooltipPosition}
+        onMouseLeave={() => setTooltipPosition(null)}
+      >
+        {prefix}
+        {value}
+      </span>
+      {tooltipPosition
+        ? createPortal(
+            <span
+              role="tooltip"
+              className={`pointer-events-none fixed z-[9999] w-max max-w-[17rem] -translate-x-1/2 rounded-md border border-[#e6eaf2]/80 bg-white px-3 py-2 text-left shadow-lg shadow-slate-950/10 dark:border-[#263247]/80 dark:bg-[#0f172a] dark:shadow-black/30 ${
+                tooltipPosition.placement === 'top' ? '-translate-y-full' : ''
+              }`}
+              style={{ left: tooltipPosition.left, top: tooltipPosition.top }}
+            >
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[#71809a] dark:text-slate-500">
+                In words
+              </span>
+              <span className="mt-0.5 block text-xs font-semibold leading-5 text-[#111827] dark:text-slate-100">
+                {tooltip}
+              </span>
+              <span
+                className={`absolute left-1/2 size-2 -translate-x-1/2 rotate-45 border-[#e6eaf2]/80 bg-white dark:border-[#263247]/80 dark:bg-[#0f172a] ${
+                  tooltipPosition.placement === 'top'
+                    ? '-bottom-1 border-b border-r'
+                    : '-top-1 border-l border-t'
+                }`}
+              />
+            </span>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+function parseFirebaseNumber(value: string) {
+  const normalized = value.replace(/,/g, '').trim();
+  if (!normalized || normalized === '--') {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function indianNumberToWords(value: number): string {
+  const absoluteValue = Math.trunc(Math.abs(value));
+  if (absoluteValue === 0) {
+    return 'Zero';
+  }
+
+  const groups = [
+    { amount: 10000000, label: 'Crore' },
+    { amount: 100000, label: 'Lakh' },
+    { amount: 1000, label: 'Thousand' },
+  ];
+  const words: string[] = [];
+  let remainder = absoluteValue;
+
+  groups.forEach(({ amount, label }) => {
+    const count = Math.floor(remainder / amount);
+    if (count > 0) {
+      words.push(`${numberBelowThousandToWords(count)} ${label}`);
+      remainder %= amount;
+    }
+  });
+
+  if (remainder > 0) {
+    words.push(numberBelowThousandToWords(remainder));
+  }
+
+  return `${value < 0 ? 'Minus ' : ''}${words.join(', ')}`;
+}
+
+function numberBelowThousandToWords(value: number): string {
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  if (value < 10) {
+    return ones[value];
+  }
+
+  if (value < 20) {
+    return teens[value - 10];
+  }
+
+  if (value < 100) {
+    return [tens[Math.floor(value / 10)], ones[value % 10]].filter(Boolean).join(' ');
+  }
+
+  return [ones[Math.floor(value / 100)], 'Hundred', numberBelowThousandToWords(value % 100)]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function firebaseSetupMessages({
+  missing,
+  errors,
+  error,
+}: {
+  missing: string[];
+  errors: string[];
+  error: string | null;
+}) {
+  const messages = new Set<string>();
+
+  if (error) {
+    messages.add('Analytics Agent is unavailable. Start the analytics-agent service and retry.');
+  }
+
+  if (missing.length) {
+    messages.add(`Configure Firebase env values: ${missing.join(', ')}.`);
+  }
+
+  if (errors.some((item) => item.includes('dependencies are not installed') || item.includes('google-auth'))) {
+    messages.add('Install analytics-agent Firebase dependencies, then restart the agent.');
+  }
+
+  if (errors.some((item) => item.includes('GOOGLE_APPLICATION_CREDENTIALS file not found'))) {
+    messages.add('Point GOOGLE_APPLICATION_CREDENTIALS to a readable Firebase service account JSON file.');
+  }
+
+  if (errors.some((item) => item.includes('GOOGLE_APPLICATION_CREDENTIALS is not configured'))) {
+    messages.add('Configure GOOGLE_APPLICATION_CREDENTIALS for Firebase API access.');
+  }
+
+  return [...messages];
+}
+
+function firebaseWarningMessages(errors: string[]) {
+  const messages = new Set<string>();
+
+  errors.forEach((item) => {
+    if (item.includes('firebasecrashlytics.googleapis.com') && item.includes('disabled')) {
+      messages.add('Enable the Firebase Crashlytics API for this Firebase project to load crash reports.');
+      return;
+    }
+
+    if (item.includes('PERMISSION_DENIED') || item.includes(' 403 ')) {
+      messages.add('Firebase API permission denied. Check the service account roles and enabled APIs.');
+      return;
+    }
+
+    messages.add(item.replace(/^(Analytics|Crashlytics):\s*/, ''));
+  });
+
+  return [...messages];
 }
 
 function EmbeddedServiceAnalyticsDashboard() {
