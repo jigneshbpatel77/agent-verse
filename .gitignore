@@ -8,6 +8,8 @@ coverage
 __pycache__
 .pytest_cache
 .env
+secrets/
+**/secrets/
 *.pyc
 *.egg-info
 data/postgres/runtime

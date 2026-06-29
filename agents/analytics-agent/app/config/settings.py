@@ -86,6 +86,15 @@ class Settings(BaseSettings):
     max_log_chars: int = Field(default=12000, alias="MAX_LOG_CHARS", ge=1000)
     alert_min_severity: str = Field(default="medium", alias="ALERT_MIN_SEVERITY")
     alert_webhook_url: Optional[str] = Field(default=None, alias="ALERT_WEBHOOK_URL")
+    google_application_credentials: Optional[str] = Field(
+        default=None, alias="GOOGLE_APPLICATION_CREDENTIALS"
+    )
+    firebase_project_id: Optional[str] = Field(default=None, alias="FIREBASE_PROJECT_ID")
+    firebase_ga4_property_id: Optional[str] = Field(default=None, alias="FIREBASE_GA4_PROPERTY_ID")
+    firebase_android_app_id: Optional[str] = Field(default=None, alias="FIREBASE_ANDROID_APP_ID")
+    firebase_request_timeout_seconds: float = Field(
+        default=20, alias="FIREBASE_REQUEST_TIMEOUT_SECONDS", ge=1
+    )
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
@@ -110,6 +119,10 @@ class Settings(BaseSettings):
         "aws_access_key_id",
         "aws_secret_access_key",
         "aws_session_token",
+        "google_application_credentials",
+        "firebase_project_id",
+        "firebase_ga4_property_id",
+        "firebase_android_app_id",
         mode="before",
     )
     @classmethod

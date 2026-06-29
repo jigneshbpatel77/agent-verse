@@ -266,7 +266,6 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
 
 function AnalyticsResponsibilityView({ responsibility }: { responsibility: (typeof analyticsResponsibilities)[number] }) {
   const Icon = responsibility.icon;
-  const isMonitoringResponsibility = responsibility.key === 'monitoring';
   const plan = executionPlanFor(responsibility.key);
   const signalCards = dashboardSignalsFor(responsibility.key);
   const coverageRows = serviceCoverageFor(responsibility.key);
@@ -277,7 +276,12 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
   }
 
   if (responsibility.key === 'monitoring') {
-    return <MonitoringAgentControl embedded />;
+    return (
+      <div className="space-y-5">
+        <FirebaseSignalsPanel />
+        <MonitoringAgentControl embedded />
+      </div>
+    );
   }
 
   return (
@@ -418,8 +422,6 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
         </article>
       </section>
 
-      {isMonitoringResponsibility ? <MonitoringAgentControl embedded /> : null}
-
       <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <Panel title="Workstream Activity">
           <div className="h-64">
@@ -528,6 +530,36 @@ interface ServiceHealthResponse {
   raw_prometheus_queries: Record<string, string>;
 }
 
+interface FirebaseOverviewResponse {
+  config: {
+    project_id: string | null;
+    ga4_property_id: string | null;
+    android_app_id: string | null;
+    service_account_configured: boolean;
+    missing: string[];
+  };
+  analytics: {
+    project_id: string;
+    property_id: string;
+    days: number;
+    generated_at: string;
+    totals: Array<{ name: string; value: number }>;
+    daily: Array<{ date: string; metrics: Record<string, number> }>;
+    breakdowns: Array<{
+      name: string;
+      dimension: string;
+      rows: Array<{ dimension: string; metrics: Record<string, number> }>;
+    }>;
+  } | null;
+  crashlytics: {
+    project_id: string;
+    app_id: string;
+    generated_at: string;
+    reports: Array<{ name: string; display_name: string | null; type: string | null }>;
+  } | null;
+  errors: string[];
+}
+
 const serviceAnalyticsLabels: Record<ServiceAnalyticsKey, string> = {
   rc: 'RC Analytics',
   challan: 'Challan Analytics',
@@ -576,6 +608,275 @@ const embeddedMetricMeta = {
   handles: { label: 'Active handles', icon: SlidersHorizontal, tone: 'slate' },
   updated: { label: 'Last updated', icon: Clock3, tone: 'slate' },
 } as const;
+
+function FirebaseSignalsPanel() {
+  const [overview, setOverview] = useState<FirebaseOverviewResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const client = new ApiClient({ baseUrl: window.location.origin });
+
+    setLoading(true);
+    setError(null);
+
+    client
+      .get<FirebaseOverviewResponse>('/api/analytics-agent/api/v1/firebase/overview?days=7', { cache: 'no-store' })
+      .then((payload) => {
+        if (!cancelled) {
+          setOverview(payload);
+        }
+      })
+      .catch((unknownError) => {
+        if (!cancelled) {
+          setOverview(null);
+          setError(unknownError instanceof Error ? unknownError.message : 'Unable to load Firebase signals.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const activeUsers = firebaseMetricValue(overview, 'activeUsers');
+  const newUsers = firebaseMetricValue(overview, 'newUsers');
+  const sessions = firebaseMetricValue(overview, 'sessions');
+  const events = firebaseMetricValue(overview, 'eventCount');
+  const views = firebaseMetricValue(overview, 'screenPageViews');
+  const engagement = firebaseMetricValue(overview, 'userEngagementDuration');
+  const activeUsersComparison = firebaseYesterdayComparison(overview, 'activeUsers');
+  const newUsersComparison = firebaseYesterdayComparison(overview, 'newUsers');
+  const sessionsComparison = firebaseYesterdayComparison(overview, 'sessions');
+  const viewsComparison = firebaseYesterdayComparison(overview, 'screenPageViews');
+  const eventsComparison = firebaseYesterdayComparison(overview, 'eventCount');
+  const engagementComparison = firebaseYesterdayComparison(overview, 'userEngagementDuration');
+  const reportsCount = overview?.crashlytics?.reports.length ?? 0;
+  const missing = overview?.config.missing ?? [];
+  const breakdowns = overview?.analytics?.breakdowns ?? [];
+
+  return (
+    <section className="app-surface rounded-lg p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex gap-4">
+          <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300">
+            <Database className="size-6" />
+          </div>
+          <div>
+            <h2 className="app-heading text-lg font-semibold">Firebase App Signals</h2>
+            <p className="app-muted mt-1 text-sm">GA4 Analytics and Crashlytics fetched from Firebase for the Android app.</p>
+          </div>
+        </div>
+        <span
+          className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${
+            loading
+              ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+              : missing.length || overview?.errors.length || error
+                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+          }`}
+        >
+          {loading ? <Loader2 className="size-4 animate-spin" /> : null}
+          {loading ? 'Loading' : missing.length || overview?.errors.length || error ? 'Setup needed' : 'Live'}
+        </span>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <FirebaseMetricCard label="Active users" value={formatFirebaseNumber(activeUsers)} icon={Activity} comparison={activeUsersComparison} />
+        <FirebaseMetricCard label="New users" value={formatFirebaseNumber(newUsers)} icon={TrendingUp} comparison={newUsersComparison} />
+        <FirebaseMetricCard label="Sessions" value={formatFirebaseNumber(sessions)} icon={Gauge} comparison={sessionsComparison} />
+        <FirebaseMetricCard label="Screen views" value={formatFirebaseNumber(views)} icon={FileText} comparison={viewsComparison} />
+        <FirebaseMetricCard label="Events" value={formatFirebaseNumber(events)} icon={BarChart3} comparison={eventsComparison} />
+        <FirebaseMetricCard label="Engagement sec" value={formatFirebaseNumber(engagement)} icon={Clock3} comparison={engagementComparison} />
+        <FirebaseMetricCard label="Crash reports" value={String(reportsCount)} icon={AlertTriangle} />
+      </div>
+
+      {breakdowns.length ? (
+        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+          {breakdowns.map((breakdown) => (
+            <FirebaseBreakdownTable key={breakdown.name} breakdown={breakdown} />
+          ))}
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+          {error}
+        </div>
+      ) : null}
+
+      {missing.length ? (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+          Add these backend env values to fetch Firebase data: {missing.join(', ')}.
+        </div>
+      ) : null}
+
+      {overview?.errors.length ? (
+        <div className="mt-4 space-y-2">
+          {overview.errors.map((item) => (
+            <p key={item} className="rounded-lg border border-amber-200 bg-white p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-slate-900 dark:text-amber-300">
+              {item}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function FirebaseMetricCard({
+  label,
+  value,
+  icon: Icon,
+  comparison,
+}: {
+  label: string;
+  value: string;
+  icon: typeof Activity;
+  comparison?: FirebaseMetricComparison | null;
+}) {
+  return (
+    <article className="app-surface-subtle rounded-lg p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="app-muted text-sm font-semibold">{label}</p>
+        <Icon className="size-4 text-sky-600 dark:text-sky-300" />
+      </div>
+      <p className="app-heading mt-3 text-xl font-semibold">{value}</p>
+      {comparison ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+              comparison.delta >= 0
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+            }`}
+          >
+            {comparison.delta >= 0 ? '+' : ''}
+            {formatFirebaseNumber(comparison.delta)}
+          </span>
+          <span className="app-muted text-xs">vs yesterday {formatFirebaseNumber(comparison.yesterday)}</span>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function FirebaseBreakdownTable({
+  breakdown,
+}: {
+  breakdown: NonNullable<FirebaseOverviewResponse['analytics']>['breakdowns'][number];
+}) {
+  const primaryMetric = preferredFirebaseMetric(breakdown);
+  const secondaryMetric = secondaryFirebaseMetric(breakdown, primaryMetric);
+
+  return (
+    <article className="app-surface-subtle rounded-lg p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="app-heading text-sm font-semibold">{breakdown.name}</h3>
+          <p className="app-muted mt-1 text-xs">{breakdown.dimension}</p>
+        </div>
+        <span className="app-muted text-xs">{breakdown.rows.length} rows</span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {breakdown.rows.length ? (
+          breakdown.rows.slice(0, 5).map((row) => (
+            <div key={`${breakdown.name}-${row.dimension}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md bg-white px-3 py-2 text-sm dark:bg-slate-950/40">
+              <span className="truncate font-medium text-[#111827] dark:text-slate-100">{row.dimension || '(not set)'}</span>
+              <span className="font-mono text-xs font-semibold text-[#4f5d73] dark:text-slate-300">
+                {formatFirebaseNumber(row.metrics[primaryMetric] ?? null)}
+              </span>
+              {secondaryMetric ? (
+                <span className="font-mono text-xs text-[#71809a] dark:text-slate-400">
+                  {formatFirebaseNumber(row.metrics[secondaryMetric] ?? null)}
+                </span>
+              ) : null}
+            </div>
+          ))
+        ) : (
+          <p className="app-muted rounded-md bg-white px-3 py-2 text-sm dark:bg-slate-950/40">No rows returned.</p>
+        )}
+      </div>
+      {primaryMetric ? (
+        <p className="app-muted mt-3 text-xs">
+          Primary: {formatFirebaseMetricLabel(primaryMetric)}
+          {secondaryMetric ? ` · Secondary: ${formatFirebaseMetricLabel(secondaryMetric)}` : ''}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+function firebaseMetricValue(overview: FirebaseOverviewResponse | null, name: string): number | null {
+  return overview?.analytics?.totals.find((metric) => metric.name === name)?.value ?? null;
+}
+
+type FirebaseMetricComparison = {
+  today: number;
+  yesterday: number;
+  delta: number;
+};
+
+function firebaseYesterdayComparison(overview: FirebaseOverviewResponse | null, metricName: string): FirebaseMetricComparison | null {
+  const daily = overview?.analytics?.daily ?? [];
+  if (daily.length < 2) {
+    return null;
+  }
+
+  const today = daily[daily.length - 1]?.metrics[metricName];
+  const yesterday = daily[daily.length - 2]?.metrics[metricName];
+  if (today === undefined || yesterday === undefined) {
+    return null;
+  }
+
+  return {
+    today,
+    yesterday,
+    delta: today - yesterday,
+  };
+}
+
+function preferredFirebaseMetric(breakdown: NonNullable<FirebaseOverviewResponse['analytics']>['breakdowns'][number]) {
+  const firstRow = breakdown.rows[0];
+  if (!firstRow) {
+    return 'activeUsers';
+  }
+  const metricNames = Object.keys(firstRow.metrics);
+  return ['eventCount', 'screenPageViews', 'activeUsers', 'sessions', 'newUsers'].find((metric) => metricNames.includes(metric)) ?? metricNames[0] ?? 'activeUsers';
+}
+
+function secondaryFirebaseMetric(
+  breakdown: NonNullable<FirebaseOverviewResponse['analytics']>['breakdowns'][number],
+  primaryMetric: string,
+) {
+  const metricNames = Object.keys(breakdown.rows[0]?.metrics ?? {});
+  return metricNames.find((metric) => metric !== primaryMetric) ?? null;
+}
+
+function formatFirebaseMetricLabel(metric: string) {
+  const labels: Record<string, string> = {
+    activeUsers: 'Active users',
+    newUsers: 'New users',
+    sessions: 'Sessions',
+    screenPageViews: 'Screen views',
+    eventCount: 'Events',
+    userEngagementDuration: 'Engagement sec',
+  };
+  return labels[metric] ?? metric;
+}
+
+function formatFirebaseNumber(value: number | null) {
+  if (value === null) {
+    return 'N/A';
+  }
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+}
 
 function EmbeddedServiceAnalyticsDashboard() {
   const [serviceKey, setServiceKey] = useState<ServiceAnalyticsKey>('rc');
