@@ -22,6 +22,10 @@ class RCHealthResponse(BaseModel):
     pod_restarts_15m: float | None = None
     provider_error_rate: float | None = None
     provider_p95_latency_ms: float | None = None
+    process_uptime_seconds: float | None = None
+    event_loop_lag_p99_ms: float | None = None
+    heap_used_bytes: float | None = None
+    active_handles: float | None = None
     generated_at: datetime
     missing_metrics: list[str] = Field(default_factory=list)
     raw_prometheus_queries: dict[str, str] = Field(default_factory=dict)

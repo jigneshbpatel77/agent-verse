@@ -26,11 +26,12 @@ interface RcHealthResponse {
 const unavailable = 'Metric not available from Prometheus';
 
 const serviceLabels: Record<string, string> = {
-  rc: 'RC Service',
-  challan: 'Challan Service',
-  'service-history': 'Service History Service',
-  fastag: 'Fastag Service',
-  payments: 'Payments Service',
+  rc: 'RC Analytics',
+  challan: 'Challan Analytics',
+  'service-history': 'Service History Analytics',
+  fastag: 'Fastag Analytics',
+  payments: 'Payments Analytics',
+  webhook: 'Webhook Analytics',
 };
 
 const serviceDescriptions: Record<string, string> = {
@@ -39,6 +40,7 @@ const serviceDescriptions: Record<string, string> = {
   'service-history': 'Service history API availability, dependency health, and response timing.',
   fastag: 'Fastag service uptime, payment-adjacent dependency health, and latency.',
   payments: 'Payment workflow request health, provider reliability, and failure indicators.',
+  webhook: 'Webhook ingestion, callback delivery, provider response health, and latency.',
 };
 
 const metricMeta = {
@@ -93,7 +95,7 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
         <span className="truncate px-1.5 py-1 text-[#111827] dark:text-slate-100">{displayName}</span>
       </nav>
 
-      <section className="app-surface overflow-hidden rounded-lg">
+      <section className="app-surface card-smooth overflow-hidden rounded-lg">
         <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex gap-4">
             <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
@@ -121,7 +123,7 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
             <Link
               key={key}
               href={`/analytics/system/${key}`}
-              className={`rounded-lg px-3 py-2 text-sm font-medium ${
+              className={`rounded-lg px-3 py-2 text-sm font-medium smooth-transition ${
                 key === serviceKey
                   ? 'bg-[#efecff] text-[#4f3ee7] dark:bg-violet-500/15 dark:text-violet-200'
                   : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
@@ -155,7 +157,7 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
-        <article className="app-surface rounded-lg p-5">
+        <article className="app-surface card-smooth rounded-lg p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-base font-semibold text-[#111827] dark:text-slate-50">Signal coverage</h2>
@@ -181,7 +183,7 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
           </div>
         </article>
 
-        <article className="app-surface rounded-lg p-5">
+        <article className="app-surface card-smooth rounded-lg p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-base font-semibold text-[#111827] dark:text-slate-50">Prometheus queries</h2>
@@ -241,7 +243,7 @@ function MetricCard({
   }[meta.tone];
 
   return (
-    <article className="app-surface min-h-36 rounded-lg p-5">
+    <article className="app-surface card-smooth min-h-36 rounded-lg p-5">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-semibold text-[#71809a] dark:text-slate-400">{meta.label}</p>
         <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${toneClass}`}>
@@ -263,13 +265,13 @@ function MetricCard({
 
 function StatusBadge({ status }: { status: RcHealthResponse['status'] }) {
   const className = {
-    healthy: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300',
-    degraded: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300',
-    critical: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300',
-    unknown: 'border-[#e1e6ef] bg-[#f8faff] text-[#4f5d73] dark:border-[#263247] dark:bg-slate-800 dark:text-slate-300',
+    healthy: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
+    degraded: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
+    critical: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
+    unknown: 'bg-[#f8faff] text-[#4f5d73] dark:bg-slate-800 dark:text-slate-300',
   }[status];
 
-  return <span className={`w-fit rounded border px-3 py-1 text-sm font-medium ${className}`}>{status}</span>;
+  return <span className={`w-fit rounded px-3 py-1 text-sm font-medium ${className}`}>{status}</span>;
 }
 
 function formatNumber(value: number | null | undefined): string | null {

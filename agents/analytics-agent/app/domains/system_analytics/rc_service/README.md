@@ -1,8 +1,8 @@
 # RC Service System Analytics
 
-This domain reads RC Service health only from Prometheus.
+This domain reads service metrics from Prometheus and resolves RC service status from the RC health check route.
 
-It does not create mock RC data, call RC business APIs, or synthesize fallback metric values. Missing Prometheus series are returned as `null`, listed in `missing_metrics`, and core metric gaps set status to `unknown`.
+It does not create mock RC data or synthesize fallback metric values. Missing Prometheus series are returned as `null` and listed in `missing_metrics`. RC status uses `RC_HEALTH_CHECK_URL`; webhook status uses `WEBHOOK_HEALTH_CHECK_URL`. HTTP 200 is healthy, auth failures are unknown, 429/5xx are critical, and other non-200 responses are degraded.
 
 ## Endpoints
 
@@ -19,6 +19,7 @@ Supported service keys:
 - `service-history`
 - `fastag`
 - `payments`
+- `webhook`
 
 ## Required Environment
 
@@ -27,6 +28,8 @@ PROMETHEUS_URL=http://localhost:9090
 RC_SERVICE_NAME=rc-service
 RC_PROVIDER_NAME=rc-provider
 RC_ENVIRONMENT=staging
+RC_HEALTH_CHECK_URL=https://vi-api.vehicleinfo.app/RC/rc_details_get_and_store/api/health_check
+WEBHOOK_HEALTH_CHECK_URL=https://webhook.vehicleinfo.app/webhook/api/health_check
 PROMETHEUS_QUERY_TIMEOUT_SECONDS=10
 ```
 

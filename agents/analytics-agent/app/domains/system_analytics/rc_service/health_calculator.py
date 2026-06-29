@@ -14,7 +14,7 @@ CORE_METRICS = {
 def calculate_status(metrics: dict[str, float | None], missing_metrics: list[str], prometheus_available: bool) -> RCHealthStatus:
     if not prometheus_available:
         return "unknown"
-    if CORE_METRICS.intersection(missing_metrics):
+    if not any(metrics.get(metric_name) is not None for metric_name in CORE_METRICS):
         return "unknown"
 
     error_rate = metrics.get("error_rate")

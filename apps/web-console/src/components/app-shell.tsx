@@ -9,7 +9,6 @@ import {
   ChevronRight,
   CircleHelp,
   Command,
-  GitBranch,
   Loader2,
   LogOut,
   Menu,
@@ -19,13 +18,12 @@ import {
   Radar,
   Search,
   ShieldAlert,
-  SlidersHorizontal,
   Sun,
   TrendingUp,
   User,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiClient } from '@/api/client';
 import { runtimeConfig } from '@/config/runtime';
 import { useAgentUiState, useShellUiState } from '@/state/app-ui-state';
@@ -40,9 +38,7 @@ const analyticsSections: Array<{ key: string; label: string; icon: LucideIcon }>
   { key: 'system', label: 'System Analytics', icon: Activity },
   { key: 'business', label: 'Business Analytics', icon: TrendingUp },
   { key: 'monitoring', label: 'Monitoring & Alerting', icon: ShieldAlert },
-  { key: 'root-cause', label: 'Root Cause Analysis', icon: GitBranch },
   { key: 'decision', label: 'Decision Intelligence', icon: Radar },
-  { key: 'optimization', label: 'Multi-Agent Optimization', icon: SlidersHorizontal },
 ];
 
 interface NotificationRecord {
@@ -60,7 +56,7 @@ interface NotificationsResponse {
 
 const fallbackNotifications: NotificationRecord[] = [
   { id: 'n1', title: 'RC provider latency crossed threshold', meta: 'High · 2m ago', severity: 'high', read: false },
-  { id: 'n2', title: 'Webhook fallback scrape enabled', meta: 'Info · 32m ago', severity: 'info', read: false },
+  { id: 'n2', title: 'Webhook metrics scrape separated', meta: 'Info · 32m ago', severity: 'info', read: false },
   { id: 'n3', title: 'CloudWatch monitor requires log groups', meta: 'Medium · 15m ago', severity: 'medium', read: false },
   { id: 'n4', title: 'Analytics health snapshot completed', meta: 'Info · 1h ago', severity: 'info', read: true },
 ];
@@ -83,6 +79,10 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
   const [notificationsLoading, setNotificationsLoading] = useState(true);
   const [notificationActionId, setNotificationActionId] = useState<string | null>(null);
   const [notificationsMarkingAll, setNotificationsMarkingAll] = useState(false);
+  const sidebarTabListRef = useRef<HTMLDivElement | null>(null);
+  const sidebarTabRefs = useRef<Partial<Record<string, HTMLAnchorElement | null>>>({});
+  const [sidebarIndicator, setSidebarIndicator] = useState({ left: 0, top: 0, width: 0, height: 0, ready: false });
+  const [sidebarLayoutResizing, setSidebarLayoutResizing] = useState(false);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -134,6 +134,52 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const searchResults = useMemo(() => buildSearchResults(searchQuery), [searchQuery]);
 
+  useEffect(() => {
+    function updateSidebarIndicator() {
+      const activeTab = sidebarTabRefs.current[activeAnalyticsTab];
+      const tabList = sidebarTabListRef.current;
+
+      if (!activeTab || !tabList) {
+        return;
+      }
+
+      setSidebarIndicator({
+        left: activeTab.offsetLeft,
+        top: activeTab.offsetTop,
+        width: activeTab.offsetWidth,
+        height: activeTab.offsetHeight,
+        ready: true,
+      });
+    }
+
+    updateSidebarIndicator();
+    const animationFrameId = window.requestAnimationFrame(updateSidebarIndicator);
+    const resizeObserver = new ResizeObserver(updateSidebarIndicator);
+    if (sidebarTabListRef.current) {
+      resizeObserver.observe(sidebarTabListRef.current);
+    }
+    const activeTab = sidebarTabRefs.current[activeAnalyticsTab];
+    if (activeTab) {
+      resizeObserver.observe(activeTab);
+    }
+    window.addEventListener('resize', updateSidebarIndicator);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateSidebarIndicator);
+    };
+  }, [activeAnalyticsTab, collapsed]);
+
+  useEffect(() => {
+    setSidebarLayoutResizing(true);
+    const timeoutId = window.setTimeout(() => {
+      setSidebarLayoutResizing(false);
+    }, 340);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [collapsed]);
+
   async function markNotificationRead(notificationId: string) {
     setNotificationActionId(notificationId);
     setNotifications((current) =>
@@ -155,16 +201,16 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
   }
 
   return (
-    <div className="min-h-screen bg-[#fbfcff] text-[#111827] [background-image:radial-gradient(#eef2f7_1px,transparent_1px)] [background-size:18px_18px] dark:bg-[#0b1020] dark:text-slate-100 dark:[background-image:radial-gradient(rgba(148,163,184,0.12)_1px,transparent_1px)]">
+    <div className="min-h-screen bg-[#fbfcff] text-[#111827] smooth-transition [background-image:radial-gradient(#eef2f7_1px,transparent_1px)] [background-size:18px_18px] dark:bg-[#0b1020] dark:text-slate-100 dark:[background-image:radial-gradient(rgba(148,163,184,0.12)_1px,transparent_1px)]">
       <aside
-        className={`fixed inset-y-0 left-0 z-40 hidden border-r border-[#e6eaf2] bg-white text-[#111827] shadow-none transition-all duration-300 dark:border-[#263247] dark:bg-[#0f172a] dark:text-slate-100 lg:block ${
+        className={`fixed inset-y-0 left-0 z-40 hidden border-r border-[#e6eaf2] bg-white text-[#111827] shadow-none transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] dark:border-[#263247] dark:bg-[#0f172a] dark:text-slate-100 lg:block ${
           collapsed ? 'w-[72px]' : 'w-[280px]'
         }`}
       >
         <div className="flex h-full flex-col">
-          <div className="flex h-[88px] items-center gap-3 px-5">
-            <div className="grid size-10 place-items-center overflow-hidden rounded-lg">
-              <Image src="/android-chrome-192x192.png" alt="AgentVerse" width={40} height={40} className="size-full object-cover" priority />
+          <div className={`flex h-[88px] items-center ${collapsed ? 'justify-center px-0' : 'gap-3 px-5'}`}>
+            <div className="grid size-10 shrink-0 place-items-center overflow-hidden">
+              <Image src="/android-chrome-192x192.png" alt="AgentVerse" width={40} height={40} className="size-full object-contain" priority />
             </div>
             {!collapsed ? (
               <div>
@@ -174,10 +220,26 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
             ) : null}
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-3 pb-4">
+          <nav className={`flex-1 pb-4 ${collapsed ? 'overflow-visible px-2' : 'overflow-y-auto px-3'}`}>
             <div className="mt-5">
               {!collapsed ? <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-[#71809a] dark:text-slate-400">Analytics</p> : null}
-              <div className="mt-2 space-y-1">
+              <div ref={sidebarTabListRef} className="relative mt-2 space-y-1">
+                <span
+                  aria-hidden="true"
+                  className={`absolute rounded-lg bg-[#efecff] will-change-[left,top,width,height] dark:bg-violet-500/15 ${
+                    sidebarLayoutResizing
+                      ? 'transition-opacity duration-150'
+                      : 'transition-[left,top,width,height,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
+                  } ${
+                    sidebarIndicator.ready ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  style={{
+                    left: sidebarIndicator.left,
+                    top: sidebarIndicator.top,
+                    width: sidebarIndicator.width,
+                    height: sidebarIndicator.height,
+                  }}
+                />
                 {analyticsSections.map((section) => {
                   const SectionIcon = section.icon;
                   const sectionActive = activeAnalyticsTab === section.key;
@@ -185,17 +247,25 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
                   return (
                     <Link
                       key={section.key}
+                      ref={(node) => {
+                        sidebarTabRefs.current[section.key] = node;
+                      }}
                       href={`/agents/analytics?tab=${section.key}`}
                       onClick={() => setSelectedAnalyticsTab(section.key)}
-                      className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                      className={`group relative z-10 flex items-center rounded-lg text-sm font-medium smooth-transition ${
                         sectionActive
-                          ? 'bg-[#efecff] text-[#4f3ee7] dark:bg-violet-500/15 dark:text-violet-200'
+                          ? 'text-[#4f3ee7] dark:text-violet-200'
                           : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
-                      }`}
+                      } ${collapsed ? 'h-11 justify-center px-0' : 'gap-3 px-3 py-2.5'}`}
                     >
                       <SectionIcon className={`size-5 shrink-0 ${sectionActive ? 'text-[#6246ea] dark:text-violet-200' : 'text-[#71809a] dark:text-slate-400'}`} />
                       {!collapsed ? <span className="min-w-0 flex-1 truncate">{section.label}</span> : null}
                       {sectionActive && !collapsed ? <span className="absolute right-3 size-2 rounded-full bg-[#6246ea] dark:bg-violet-300" /> : null}
+                      {collapsed ? (
+                        <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-lg border border-[#e6eaf2] bg-white px-3 py-2 text-sm font-semibold text-[#111827] opacity-0 shadow-lg shadow-slate-900/10 transition group-hover:opacity-100 dark:border-[#263247] dark:bg-[#111827] dark:text-slate-100 dark:shadow-black/30">
+                          {section.label}
+                        </span>
+                      ) : null}
                     </Link>
                   );
                 })}
@@ -203,10 +273,10 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
             </div>
           </nav>
 
-          <div className="border-t border-[#e6eaf2] p-4 dark:border-[#263247]">
-            <div className="rounded-xl bg-white p-3 dark:bg-slate-900/80">
+          <div className={`border-t border-[#e6eaf2] dark:border-[#263247] ${collapsed ? 'flex justify-center p-3' : 'p-4'}`}>
+            <div className={collapsed ? 'grid place-items-center' : 'rounded-xl bg-white p-3 dark:bg-slate-900/80'}>
               <div className="flex items-center gap-3">
-                <div className="grid size-10 place-items-center rounded-full bg-gradient-to-br from-[#5b4cf6] to-[#7b2eea] text-sm font-semibold text-white">S</div>
+                <div className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#5b4cf6] to-[#7b2eea] text-sm font-semibold text-white">S</div>
                 {!collapsed ? (
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">Sahil JR</p>
@@ -216,10 +286,10 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
               </div>
               {!collapsed ? (
                 <div className="mt-3 grid gap-1 text-sm text-[#4f5d73] dark:text-slate-300">
-                  <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:hover:bg-violet-500/10 dark:hover:text-violet-200">
+                  <button className="smooth-transition flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:hover:bg-violet-500/10 dark:hover:text-violet-200">
                     <User className="size-4" /> Profile
                   </button>
-                  <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:hover:bg-violet-500/10 dark:hover:text-violet-200">
+                  <button className="smooth-transition flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:hover:bg-violet-500/10 dark:hover:text-violet-200">
                     <LogOut className="size-4" /> Logout
                   </button>
                 </div>
@@ -234,12 +304,12 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
           <button
             type="button"
             onClick={() => setCollapsed((value) => !value)}
-            className="hidden rounded-lg border border-[#e1e6ef] bg-white p-2 text-[#64748b] hover:bg-[#f8faff] dark:border-[#263247] dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 lg:block"
+            className="app-button-secondary hidden rounded-lg p-2 text-[#64748b] lg:block"
             aria-label="Toggle sidebar"
           >
             {collapsed ? <PanelLeftOpen className="size-5" /> : <PanelLeftClose className="size-5" />}
           </button>
-          <button className="rounded-lg border border-[#e1e6ef] bg-white p-2 text-[#64748b] dark:border-[#263247] dark:bg-slate-900 dark:text-slate-200 lg:hidden">
+          <button className="app-button-secondary rounded-lg p-2 text-[#64748b] lg:hidden">
             <Menu className="size-5" />
           </button>
 
@@ -251,7 +321,7 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="mx-auto hidden w-full max-w-xl items-center gap-3 rounded-xl border border-[#dfe5ee] bg-white px-3 py-2 text-left text-[#71809a] shadow-sm hover:border-[#cfc7ff] hover:bg-white dark:border-[#263247] dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-500/40 dark:hover:bg-slate-900 md:flex"
+            className="smooth-transition mx-auto hidden w-full max-w-xl items-center gap-3 rounded-xl border border-[#dfe5ee] bg-white px-3 py-2 text-left text-[#71809a] shadow-sm hover:border-[#cfc7ff] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d8d1ff] dark:border-[#263247] dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-500/40 dark:hover:bg-slate-900 dark:focus-visible:ring-violet-500/30 md:flex"
           >
             <Search className="size-4" />
             <span className="flex-1 text-sm">Search analytics...</span>
@@ -264,7 +334,7 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
             <button
               type="button"
               onClick={() => setDarkMode((value) => !value)}
-              className="rounded-full border border-[#e1e6ef] bg-white p-2 text-[#64748b] shadow-sm hover:bg-[#f8faff] dark:border-[#263247] dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="app-button-secondary rounded-full p-2 text-[#64748b] shadow-sm"
               aria-label="Toggle theme"
             >
               {darkMode ? <Sun className="size-5" /> : <Moon className="size-5" />}
@@ -302,7 +372,7 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
                             type="button"
                             disabled={notificationActionId === notification.id}
                             onClick={() => void markNotificationRead(notification.id)}
-                            className="flex w-full gap-3 rounded-lg p-3 text-left hover:bg-[#f4f1ff] disabled:cursor-not-allowed disabled:opacity-70 dark:hover:bg-violet-500/10"
+                            className="smooth-transition flex w-full gap-3 rounded-lg p-3 text-left hover:bg-[#f4f1ff] disabled:cursor-not-allowed disabled:opacity-70 dark:hover:bg-violet-500/10"
                           >
                             {notificationActionId === notification.id ? (
                               <Spinner className="mt-0.5 size-3.5 shrink-0 text-[#6246ea]" />
@@ -333,7 +403,7 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
                 <Popover title="Help">
                   <div className="space-y-2">
                     {helpItems.map((item) => (
-                      <div key={item.label} className="rounded-lg p-3 hover:bg-[#f4f1ff] dark:hover:bg-violet-500/10">
+                      <div key={item.label} className="smooth-transition rounded-lg p-3 hover:bg-[#f4f1ff] dark:hover:bg-violet-500/10">
                         <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{item.label}</p>
                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.detail}</p>
                       </div>
@@ -345,13 +415,17 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
           </div>
         </header>
 
-        <main className="px-4 py-6 sm:px-6 xl:px-8">{children}</main>
+        <main className="px-4 py-6 sm:px-6 xl:px-8">
+          <div key={pathname ?? 'root'} className="animate-page-enter">
+            {children}
+          </div>
+        </main>
       </div>
 
       {searchOpen ? (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 p-4 backdrop-blur-sm" onClick={() => setSearchOpen(false)}>
+        <div className="fixed inset-0 z-50 bg-slate-950/40 p-4 backdrop-blur-sm smooth-transition" onClick={() => setSearchOpen(false)}>
           <div
-            className="mx-auto mt-24 max-w-2xl rounded-xl border border-[#e1e6ef] bg-white shadow-2xl dark:border-[#263247] dark:bg-slate-900"
+            className="animate-modal-enter mx-auto mt-24 max-w-2xl rounded-xl border border-[#e1e6ef] bg-white shadow-2xl dark:border-[#263247] dark:bg-slate-900"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center gap-3 border-b border-[#e1e6ef] px-4 py-3 dark:border-[#263247]">
@@ -368,10 +442,10 @@ export function AppShell({ title, eyebrow = 'Analytics agent workspace', childre
             <div className="max-h-96 overflow-y-auto p-2">
               {searchResults.map((item) => (
                 <Link
-                  key={item.href}
+                  key={`${item.type}:${item.label}:${item.href}`}
                   href={item.href}
                   onClick={() => setSearchOpen(false)}
-                  className="flex items-center justify-between rounded-lg px-3 py-3 hover:bg-[#f4f1ff] dark:hover:bg-violet-500/10"
+                  className="smooth-transition flex items-center justify-between rounded-lg px-3 py-3 hover:bg-[#f4f1ff] dark:hover:bg-violet-500/10"
                 >
                   <span>
                     <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">{item.label}</span>
@@ -414,7 +488,7 @@ function IconButton({ icon: Icon, badge, loading = false, onClick }: { icon: Luc
     <button
       type="button"
       onClick={onClick}
-      className="relative rounded-full border border-[#e1e6ef] bg-white p-2 text-[#64748b] shadow-sm hover:bg-[#f8faff] dark:border-[#263247] dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+      className="app-button-secondary relative rounded-full p-2 text-[#64748b] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d8d1ff] dark:focus-visible:ring-violet-500/30"
     >
       {loading ? <Spinner className="size-5 text-[#6246ea]" /> : <Icon className="size-5" />}
       {badge ? (
@@ -430,7 +504,7 @@ function Spinner({ className = 'size-4' }: { className?: string }) {
 
 function Popover({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="absolute right-0 top-12 z-50 w-80 rounded-xl border border-[#e1e6ef] bg-white p-3 shadow-2xl dark:border-[#263247] dark:bg-slate-900">
+    <div className="animate-popover-enter absolute right-0 top-12 z-50 w-80 rounded-xl border border-[#e1e6ef] bg-white p-3 shadow-2xl dark:border-[#263247] dark:bg-slate-900">
       <div className="border-b border-[#e1e6ef] px-2 pb-2 text-sm font-semibold text-[#111827] dark:border-[#263247] dark:text-slate-100">
         {title}
       </div>
@@ -441,13 +515,10 @@ function Popover({ title, children }: { title: string; children: ReactNode }) {
 
 function buildSearchResults(query: string): Array<{ label: string; href: string; type: string }> {
   const items = [
-    { label: 'Analytics Agent', href: '/agents/analytics?tab=system', type: 'Dashboard' },
     { label: 'System Analytics', href: '/agents/analytics?tab=system', type: 'Responsibility' },
     { label: 'Business Analytics', href: '/agents/analytics?tab=business', type: 'Responsibility' },
     { label: 'Monitoring & Alerting', href: '/agents/analytics?tab=monitoring', type: 'Responsibility' },
-    { label: 'Root Cause Analysis', href: '/agents/analytics?tab=root-cause', type: 'Responsibility' },
     { label: 'Decision Intelligence', href: '/agents/analytics?tab=decision', type: 'Responsibility' },
-    { label: 'Multi-Agent Optimization', href: '/agents/analytics?tab=optimization', type: 'Responsibility' },
     { label: 'RC Service Analytics', href: '/analytics/system/rc', type: 'Service Metrics' },
   ];
 

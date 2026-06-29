@@ -24,9 +24,17 @@ class Settings(BaseSettings):
     rc_provider_name: str = Field(default="rc-provider", alias="RC_PROVIDER_NAME")
     rc_environment: str = Field(default="staging", alias="RC_ENVIRONMENT")
     prometheus_query_timeout_seconds: float = Field(default=10, alias="PROMETHEUS_QUERY_TIMEOUT_SECONDS")
+    rc_health_check_url: str | None = Field(
+        default="https://vi-api.vehicleinfo.app/RC/rc_details_get_and_store/api/health_check",
+        alias="RC_HEALTH_CHECK_URL",
+    )
+    webhook_health_check_url: str | None = Field(
+        default="https://webhook.vehicleinfo.app/webhook/api/health_check",
+        alias="WEBHOOK_HEALTH_CHECK_URL",
+    )
     rc_service_label: str = Field(default="service", alias="RC_SERVICE_LABEL")
     rc_provider_label: str = Field(default="provider", alias="RC_PROVIDER_LABEL")
-    rc_status_label: str = Field(default="status", alias="RC_STATUS_LABEL")
+    rc_status_label: str = Field(default="status_code", alias="RC_STATUS_LABEL")
     rc_environment_label: str | None = Field(default=None, alias="RC_ENVIRONMENT_LABEL")
     rc_pod_label: str = Field(default="pod", alias="RC_POD_LABEL")
     rc_pod_pattern: str = Field(default="rc-service.*", alias="RC_POD_PATTERN")

@@ -16,15 +16,12 @@ scrape_configs:
           provider: rc-provider
           environment: staging
 
-  # Temporary local testing fallback while RC metrics access is restricted.
-  # Remove this job after vi-api.vehicleinfo.app allows Prometheus to scrape RC metrics.
-  - job_name: rc-service-webhook-fallback
+  - job_name: webhook-service
     scheme: https
     metrics_path: /webhook/api/metrics
     static_configs:
       - targets: ["webhook.vehicleinfo.app"]
         labels:
-          service: rc-service
-          provider: rc-provider
+          service: webhook-service
+          provider: webhook-provider
           environment: staging
-          source_service: webhook-test-fallback

@@ -37,13 +37,72 @@ html:not(.dark) body {
   color-scheme: light;
 }
 
+:root {
+  --motion-fast: 150ms;
+  --motion-normal: 250ms;
+  --motion-slow: 350ms;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes popover-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 @layer components {
   .app-surface {
     @apply border border-[#e6eaf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-[#263247] dark:bg-[#111827] dark:shadow-none;
+    transition:
+      background-color var(--motion-normal) var(--motion-ease),
+      border-color var(--motion-normal) var(--motion-ease),
+      box-shadow var(--motion-normal) var(--motion-ease),
+      transform var(--motion-normal) var(--motion-ease);
   }
 
   .app-surface-subtle {
     @apply border border-[#e6eaf2] bg-white dark:border-[#263247] dark:bg-[#0f172a];
+    transition:
+      background-color var(--motion-normal) var(--motion-ease),
+      border-color var(--motion-normal) var(--motion-ease),
+      box-shadow var(--motion-normal) var(--motion-ease),
+      transform var(--motion-normal) var(--motion-ease);
   }
 
   .app-muted {
@@ -60,9 +119,82 @@ html:not(.dark) body {
 
   .app-button-secondary {
     @apply border border-[#e1e6ef] bg-white text-[#111827] hover:bg-[#f8faff] dark:border-[#263247] dark:bg-[#0f172a] dark:text-slate-100 dark:hover:bg-[#182338];
+    transition:
+      background-color var(--motion-normal) var(--motion-ease),
+      border-color var(--motion-normal) var(--motion-ease),
+      color var(--motion-normal) var(--motion-ease),
+      box-shadow var(--motion-normal) var(--motion-ease),
+      transform var(--motion-fast) var(--motion-ease);
+  }
+
+  .app-button-secondary:active {
+    transform: translateY(1px);
   }
 
   .app-button-primary {
     @apply bg-gradient-to-r from-[#5b4cf6] to-[#7b2eea] text-white shadow-sm shadow-[#6246ea]/20 hover:from-[#5142e8] hover:to-[#6f26dc] disabled:from-slate-300 disabled:to-slate-300 disabled:text-white disabled:shadow-none dark:disabled:from-[#263247] dark:disabled:to-[#263247] dark:disabled:text-slate-500;
+    transition:
+      background-color var(--motion-normal) var(--motion-ease),
+      border-color var(--motion-normal) var(--motion-ease),
+      color var(--motion-normal) var(--motion-ease),
+      box-shadow var(--motion-normal) var(--motion-ease),
+      transform var(--motion-fast) var(--motion-ease),
+      opacity var(--motion-normal) var(--motion-ease);
+  }
+
+  .app-button-primary:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .smooth-transition {
+    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+    transition-duration: var(--motion-normal);
+    transition-timing-function: var(--motion-ease);
+  }
+
+  .card-smooth {
+    transition:
+      background-color var(--motion-normal) var(--motion-ease),
+      border-color var(--motion-normal) var(--motion-ease),
+      box-shadow var(--motion-normal) var(--motion-ease),
+      transform var(--motion-normal) var(--motion-ease);
+  }
+
+  .animate-page-enter {
+    animation: page-enter 260ms var(--motion-ease);
+  }
+
+  .animate-popover-enter {
+    animation: popover-enter 180ms var(--motion-ease);
+    transform-origin: top right;
+    will-change: transform, opacity;
+  }
+
+  .animate-modal-enter {
+    animation: modal-enter 220ms var(--motion-ease);
+    will-change: transform, opacity;
+  }
+
+  .skeleton {
+    @apply rounded-md;
+    background: linear-gradient(90deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0.28), rgba(148, 163, 184, 0.12));
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.25s var(--motion-ease) infinite;
+  }
+
+  .dark .skeleton {
+    background: linear-gradient(90deg, rgba(148, 163, 184, 0.08), rgba(148, 163, 184, 0.18), rgba(148, 163, 184, 0.08));
+    background-size: 200% 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

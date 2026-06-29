@@ -1,3 +1,3 @@
 # Web Console
 
-Next.js frontend for managing agents, workflows, approvals, knowledge, incidents, reports, deployments, and settings.
+Next.js frontend for the Analytics Agent console, service analytics, monitoring, reports, approvals, knowledge, workflows, tasks, and settings.

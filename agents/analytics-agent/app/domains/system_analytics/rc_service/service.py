@@ -1,10 +1,12 @@
 from datetime import UTC, datetime
 import math
 
+import httpx
+
 from app.config.settings import get_settings
 from app.domains.system_analytics.rc_service.health_calculator import calculate_status
 from app.domains.system_analytics.rc_service.queries import ServiceQueryConfig, build_service_queries
-from app.domains.system_analytics.rc_service.schemas import MetricDiscoveryResponse, RCHealthResponse, SystemServiceSummary
+from app.domains.system_analytics.rc_service.schemas import MetricDiscoveryResponse, RCHealthResponse, RCHealthStatus, SystemServiceSummary
 from app.integrations.prometheus_client import PrometheusClient, PrometheusClientError
 
 
@@ -16,6 +18,7 @@ DISCOVERY_KEYWORDS = (
     "external",
     "provider",
     "rc",
+    "webhook",
     "container",
     "kube",
 )
@@ -26,6 +29,7 @@ VEHICLEINFO_SYSTEM_SERVICES = {
     "service-history": "Service History Service",
     "fastag": "Fastag Service",
     "payments": "Payments Service",
+    "webhook": "Webhook Service",
 }
 
 
@@ -65,7 +69,8 @@ class RCSystemAnalyticsService:
             if values[metric_name] is None:
                 missing_metrics.append(metric_name)
 
-        status = calculate_status(values, missing_metrics, prometheus_available)
+        metric_status = calculate_status(values, missing_metrics, prometheus_available)
+        status = await self._health_check_status_for(normalized_service_key) or metric_status
 
         return RCHealthResponse(
             service_key=normalized_service_key,
@@ -82,6 +87,10 @@ class RCSystemAnalyticsService:
             pod_restarts_15m=values.get("pod_restarts_15m"),
             provider_error_rate=values.get("provider_error_rate"),
             provider_p95_latency_ms=values.get("provider_p95_latency_ms"),
+            process_uptime_seconds=values.get("process_uptime_seconds"),
+            event_loop_lag_p99_ms=values.get("event_loop_lag_p99_ms"),
+            heap_used_bytes=values.get("heap_used_bytes"),
+            active_handles=values.get("active_handles"),
             generated_at=datetime.now(UTC),
             missing_metrics=missing_metrics,
             raw_prometheus_queries=queries,
@@ -102,13 +111,14 @@ class RCSystemAnalyticsService:
         )
 
     def _query_config_for(self, service_key: str) -> ServiceQueryConfig:
+        is_webhook = service_key == "webhook"
         return ServiceQueryConfig(
             service_name=self._service_name_for(service_key),
             provider_name=self._provider_name_for(service_key),
             environment=self.settings.rc_environment,
             service_label=self.settings.rc_service_label,
             provider_label=self.settings.rc_provider_label,
-            status_label=self.settings.rc_status_label,
+            status_label="status_code" if is_webhook else self.settings.rc_status_label,
             environment_label=self.settings.rc_environment_label,
             pod_label=self.settings.rc_pod_label,
             pod_pattern=self._pod_pattern_for(service_key),
@@ -117,9 +127,41 @@ class RCSystemAnalyticsService:
             external_requests_metric=self.settings.rc_external_requests_metric,
             external_duration_bucket_metric=self.settings.rc_external_duration_bucket_metric,
             pod_restarts_metric=self.settings.rc_pod_restarts_metric,
-            cpu_usage_metric=self.settings.rc_cpu_usage_metric,
-            memory_working_set_metric=self.settings.rc_memory_working_set_metric,
+            cpu_usage_metric="process_cpu_seconds_total" if is_webhook else self.settings.rc_cpu_usage_metric,
+            memory_working_set_metric="process_resident_memory_bytes" if is_webhook else self.settings.rc_memory_working_set_metric,
+            excluded_label_values=self._excluded_label_values_for(service_key),
+            service_matchers_override=self._service_matchers_override_for(service_key),
+            runtime_matchers_override=self._runtime_matchers_override_for(service_key),
+            include_provider_metrics=not is_webhook,
+            include_pod_restart_metrics=not is_webhook,
+            extra_queries=self._extra_queries_for(service_key),
         )
+
+    async def _health_check_status_for(self, service_key: str) -> RCHealthStatus | None:
+        health_check_url = self._health_check_url_for(service_key)
+        if not health_check_url:
+            return None
+
+        try:
+            async with httpx.AsyncClient(timeout=self.settings.prometheus_query_timeout_seconds) as client:
+                response = await client.get(health_check_url)
+        except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPError):
+            return "unknown"
+
+        if response.status_code == 200:
+            return "healthy"
+        if response.status_code in {401, 403}:
+            return "unknown"
+        if response.status_code == 429 or response.status_code >= 500:
+            return "critical"
+        return "degraded"
+
+    def _health_check_url_for(self, service_key: str) -> str | None:
+        if service_key == "rc":
+            return self.settings.rc_health_check_url
+        if service_key == "webhook":
+            return self.settings.webhook_health_check_url
+        return None
 
     def _service_name_for(self, service_key: str) -> str:
         if service_key == "rc":
@@ -135,6 +177,37 @@ class RCSystemAnalyticsService:
         if service_key == "rc":
             return self.settings.rc_pod_pattern
         return f"{service_key}-service.*"
+
+    def _excluded_label_values_for(self, service_key: str) -> tuple[tuple[str, str], ...]:
+        if service_key != "rc":
+            return ()
+        return (
+            ("job", "rc-service-webhook-fallback"),
+            ("source_service", "webhook-test-fallback"),
+            (self.settings.rc_service_label, "webhook-service"),
+        )
+
+    def _service_matchers_override_for(self, service_key: str) -> tuple[tuple[str, str, str], ...]:
+        if service_key != "webhook":
+            return ()
+        return (("job", "=~", "webhook-service|rc-service-webhook-fallback"),)
+
+    def _runtime_matchers_override_for(self, service_key: str) -> tuple[tuple[str, str, str], ...]:
+        if service_key != "webhook":
+            return ()
+        return (("job", "=~", "webhook-service|rc-service-webhook-fallback"),)
+
+    def _extra_queries_for(self, service_key: str) -> tuple[tuple[str, str], ...]:
+        if service_key != "webhook":
+            return ()
+
+        matchers = 'job=~"webhook-service|rc-service-webhook-fallback"'
+        return (
+            ("process_uptime_seconds", f"max(time() - process_start_time_seconds{{{matchers}}})"),
+            ("event_loop_lag_p99_ms", f"max(nodejs_eventloop_lag_p99_seconds{{{matchers}}}) * 1000"),
+            ("heap_used_bytes", f"max(nodejs_heap_size_used_bytes{{{matchers}}})"),
+            ("active_handles", f"max(nodejs_active_handles_total{{{matchers}}})"),
+        )
 
     def _normalize_service_key(self, service_key: str) -> str:
         normalized = service_key.strip().lower()

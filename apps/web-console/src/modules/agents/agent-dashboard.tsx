@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -13,7 +13,6 @@ import {
   Cpu,
   Database,
   FileText,
-  GitBranch,
   Gauge,
   HardDrive,
   Loader2,
@@ -90,20 +89,6 @@ const analyticsResponsibilities = [
     actions: ['Alert rules', 'Incident feed', 'SLO review'],
   },
   {
-    key: 'root-cause',
-    title: 'Root Cause Analysis',
-    icon: GitBranch,
-    status: 'Planned',
-    summary: 'Failure investigation, dependency mapping, and error correlation across agents and services.',
-    output: 'Root cause reports and corrective plans',
-    metrics: [
-      { label: 'Signals', value: '6' },
-      { label: 'Mappings', value: 'Pending' },
-      { label: 'Reports', value: '0' },
-    ],
-    actions: ['Dependency map', 'Failure trace', 'Correction plan'],
-  },
-  {
     key: 'decision',
     title: 'Decision Intelligence',
     icon: Radar,
@@ -116,20 +101,6 @@ const analyticsResponsibilities = [
       { label: 'Signals', value: '4' },
     ],
     actions: ['Opportunity score', 'Action queue', 'Risk review'],
-  },
-  {
-    key: 'optimization',
-    title: 'Multi-Agent Optimization',
-    icon: SlidersHorizontal,
-    status: 'Planned',
-    summary: 'Agent collaboration, routing, redundancy detection, and delegation optimization.',
-    output: 'Ecosystem improvement plan',
-    metrics: [
-      { label: 'Routes', value: '13' },
-      { label: 'Redundancy', value: 'Pending' },
-      { label: 'Plans', value: '0' },
-    ],
-    actions: ['Routing audit', 'Delegation plan', 'Load balance'],
   },
 ];
 
@@ -148,7 +119,7 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
 
   return (
     <div className="space-y-6">
-      <section className="app-surface rounded-lg p-5">
+      <section className="app-surface card-smooth rounded-lg p-5">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-center gap-4">
             <div className={`grid size-14 place-items-center rounded-xl ${agent.accent}`}>
@@ -305,6 +276,10 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
     return <EmbeddedServiceAnalyticsDashboard />;
   }
 
+  if (responsibility.key === 'monitoring') {
+    return <MonitoringAgentControl embedded />;
+  }
+
   return (
     <div className="space-y-5">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -325,7 +300,7 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <article className="app-surface rounded-lg p-5">
+        <article className="app-surface card-smooth rounded-lg p-5">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex gap-4">
               <div className="grid size-14 shrink-0 place-items-center rounded-xl bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
@@ -417,7 +392,7 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
           )}
         </article>
 
-        <article className="app-surface rounded-lg p-5">
+        <article className="app-surface card-smooth rounded-lg p-5">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="app-heading text-base font-semibold">Service Coverage</h2>
@@ -527,7 +502,7 @@ export function AgentNotFound() {
   );
 }
 
-type ServiceAnalyticsKey = 'rc' | 'challan' | 'service-history' | 'fastag' | 'payments';
+type ServiceAnalyticsKey = 'rc' | 'challan' | 'service-history' | 'fastag' | 'payments' | 'webhook';
 
 interface ServiceHealthResponse {
   service_key: string;
@@ -544,6 +519,10 @@ interface ServiceHealthResponse {
   pod_restarts_15m: number | null;
   provider_error_rate: number | null;
   provider_p95_latency_ms: number | null;
+  process_uptime_seconds: number | null;
+  event_loop_lag_p99_ms: number | null;
+  heap_used_bytes: number | null;
+  active_handles: number | null;
   generated_at: string;
   missing_metrics: string[];
   raw_prometheus_queries: Record<string, string>;
@@ -555,6 +534,7 @@ const serviceAnalyticsLabels: Record<ServiceAnalyticsKey, string> = {
   'service-history': 'Service History Analytics',
   fastag: 'Fastag Analytics',
   payments: 'Payments Analytics',
+  webhook: 'Webhook Analytics',
 };
 
 const serviceAnalyticsDescriptions: Record<ServiceAnalyticsKey, string> = {
@@ -563,7 +543,18 @@ const serviceAnalyticsDescriptions: Record<ServiceAnalyticsKey, string> = {
   'service-history': 'Vehicle service history availability, dependency health, and response timing.',
   fastag: 'Fastag balance, recharge, provider response health, and latency.',
   payments: 'Payment initiation, callback, success rate, timeout, and provider reliability.',
+  webhook: 'Webhook ingestion, callback delivery, provider response health, and latency.',
 };
+
+const refreshIntervals = [
+  { label: '1 min', value: 60_000 },
+  { label: '10 min', value: 600_000 },
+  { label: '15 min', value: 900_000 },
+  { label: '30 min', value: 1_800_000 },
+  { label: '1 h', value: 3_600_000 },
+  { label: '3 h', value: 10_800_000 },
+  { label: '10 h', value: 36_000_000 },
+] as const;
 
 const embeddedUnavailable = 'Metric not available from Prometheus';
 
@@ -579,6 +570,10 @@ const embeddedMetricMeta = {
   restarts: { label: 'Pod restarts', icon: RotateCcw, tone: 'amber' },
   providerLatency: { label: 'Provider latency', icon: Wifi, tone: 'violet' },
   providerError: { label: 'Provider error rate', icon: AlertTriangle, tone: 'red' },
+  uptime: { label: 'Uptime', icon: Clock3, tone: 'slate' },
+  eventLoop: { label: 'Event loop P99', icon: Activity, tone: 'violet' },
+  heap: { label: 'Heap used', icon: Database, tone: 'slate' },
+  handles: { label: 'Active handles', icon: SlidersHorizontal, tone: 'slate' },
   updated: { label: 'Last updated', icon: Clock3, tone: 'slate' },
 } as const;
 
@@ -587,53 +582,100 @@ function EmbeddedServiceAnalyticsDashboard() {
   const [health, setHealth] = useState<ServiceHealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [refreshIntervalMs, setRefreshIntervalMs] = useState<(typeof refreshIntervals)[number]['value']>(refreshIntervals[0].value);
+  const requestIdRef = useRef(0);
+  const serviceTabListRef = useRef<HTMLElement | null>(null);
+  const serviceTabRefs = useRef<Partial<Record<ServiceAnalyticsKey, HTMLButtonElement | null>>>({});
+  const [activeTabIndicator, setActiveTabIndicator] = useState({ left: 0, top: 0, width: 0, height: 0, ready: false });
 
-  useEffect(() => {
-    let cancelled = false;
-    const client = new ApiClient({ baseUrl: runtimeConfig.apiBaseUrl });
+  const loadHealth = useCallback(
+    async ({ showInitialLoader = false }: { showInitialLoader?: boolean } = {}) => {
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
+      const client = new ApiClient({ baseUrl: runtimeConfig.apiBaseUrl });
 
-    setLoading(true);
-    setError(null);
+      if (showInitialLoader) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+      setError(null);
 
-    client
-      .get<ServiceHealthResponse>(`/api/analytics/system/${serviceKey}/health`, { cache: 'no-store' })
-      .then((payload) => {
-        if (!cancelled) {
+      try {
+        const payload = await client.get<ServiceHealthResponse>(`/api/analytics/system/${serviceKey}/health`, { cache: 'no-store' });
+        if (requestId === requestIdRef.current) {
           setHealth(payload);
         }
-      })
-      .catch((unknownError) => {
-        if (!cancelled) {
+      } catch (unknownError) {
+        if (requestId === requestIdRef.current) {
           setHealth(null);
           setError(unknownError instanceof Error ? unknownError.message : 'Unable to load service analytics.');
         }
-      })
-      .finally(() => {
-        if (!cancelled) {
+      } finally {
+        if (requestId === requestIdRef.current) {
           setLoading(false);
+          setRefreshing(false);
         }
+      }
+    },
+    [serviceKey],
+  );
+
+  useEffect(() => {
+    loadHealth({ showInitialLoader: true });
+  }, [loadHealth]);
+
+  useEffect(() => {
+    if (!autoRefreshEnabled) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      loadHealth();
+    }, refreshIntervalMs);
+
+    return () => window.clearInterval(intervalId);
+  }, [autoRefreshEnabled, loadHealth, refreshIntervalMs]);
+
+  useEffect(() => {
+    function updateActiveTabIndicator() {
+      const activeTab = serviceTabRefs.current[serviceKey];
+      const tabList = serviceTabListRef.current;
+
+      if (!activeTab || !tabList) {
+        return;
+      }
+
+      setActiveTabIndicator({
+        left: activeTab.offsetLeft,
+        top: activeTab.offsetTop,
+        width: activeTab.offsetWidth,
+        height: activeTab.offsetHeight,
+        ready: true,
       });
+    }
+
+    updateActiveTabIndicator();
+    const animationFrameId = window.requestAnimationFrame(updateActiveTabIndicator);
+    const resizeObserver = new ResizeObserver(updateActiveTabIndicator);
+    if (serviceTabListRef.current) {
+      resizeObserver.observe(serviceTabListRef.current);
+    }
+    window.addEventListener('resize', updateActiveTabIndicator);
 
     return () => {
-      cancelled = true;
+      window.cancelAnimationFrame(animationFrameId);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateActiveTabIndicator);
     };
   }, [serviceKey]);
 
   const missingCount = health?.missing_metrics.length ?? 0;
-  const availableCount = [
-    health?.request_rate,
-    health?.error_rate,
-    health?.p50_latency_ms,
-    health?.p90_latency_ms,
-    health?.p95_latency_ms,
-    health?.p99_latency_ms,
-    health?.cpu_usage,
-    health?.memory_usage_bytes,
-    health?.pod_restarts_15m,
-    health?.provider_p95_latency_ms,
-    health?.provider_error_rate,
-  ].filter((value) => value !== null && value !== undefined).length;
-
+  const metricCards = buildEmbeddedMetricCards(serviceKey, health);
+  const availableCount = metricCards.filter((card) => card.value !== null).length;
+  const totalSignals = metricCards.length;
   return (
     <div className="space-y-5">
       <section className="app-surface overflow-hidden rounded-lg">
@@ -651,29 +693,89 @@ function EmbeddedServiceAnalyticsDashboard() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {loading ? (
-              <span className="inline-flex items-center gap-2 rounded border border-[#e1e6ef] bg-[#f8faff] px-3 py-1 text-sm font-medium text-[#4f5d73] dark:border-[#263247] dark:bg-slate-800 dark:text-slate-300">
-                <Loader2 className="size-4 animate-spin" /> Loading
+          <div className="flex flex-col items-start gap-6 lg:ml-auto lg:items-end">
+            <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+              <span className="inline-flex h-8 items-center text-sm font-semibold text-[#71809a] dark:text-slate-400">
+                {availableCount}/{totalSignals} signals
               </span>
-            ) : (
-              <EmbeddedStatusBadge status={health?.status ?? 'unknown'} />
-            )}
-            <span className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 text-sm font-medium text-[#4f5d73] dark:border-[#263247] dark:bg-slate-950/40 dark:text-slate-300">
-              {availableCount}/11 signals
-            </span>
+              {loading ? (
+                <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-[#e1e6ef] bg-[#f8faff] px-3 text-sm font-medium text-[#4f5d73] dark:border-[#263247] dark:bg-slate-800 dark:text-slate-300">
+                  <Loader2 className="size-4 animate-spin" /> Loading
+                </span>
+              ) : (
+                <EmbeddedStatusBadge status={health?.status ?? 'unknown'} />
+              )}
+            </div>
+
+            <div className="inline-flex h-8 max-w-full items-center gap-1 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-0.5 dark:border-[#263247] dark:bg-[#0f172a]">
+              <span className="grid size-7 shrink-0 place-items-center text-[#71809a] dark:text-slate-500" aria-label="Auto refresh">
+                {refreshing ? <Loader2 className="size-3.5 animate-spin text-[#6246ea] dark:text-violet-300" /> : <Clock3 className="size-3.5" />}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextEnabled = !autoRefreshEnabled;
+                  setAutoRefreshEnabled(nextEnabled);
+                  if (nextEnabled) {
+                    void loadHealth();
+                  }
+                }}
+                className={`inline-flex h-7 min-w-16 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-semibold smooth-transition ${
+                  autoRefreshEnabled
+                    ? 'bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15'
+                    : 'bg-[#6246ea] text-white hover:bg-[#5438d9] dark:bg-violet-600 dark:hover:bg-violet-500'
+                }`}
+              >
+                {autoRefreshEnabled ? <Pause className="size-3" /> : <Play className="size-3" />}
+                {autoRefreshEnabled ? 'Stop' : 'Start'}
+              </button>
+
+              <select
+                value={refreshIntervalMs}
+                onChange={(event) => setRefreshIntervalMs(Number(event.target.value) as (typeof refreshIntervals)[number]['value'])}
+                disabled={!autoRefreshEnabled}
+                aria-label="Refresh interval"
+                className="h-7 min-w-20 rounded-md border border-transparent bg-white px-2 text-xs font-semibold text-[#4f5d73] outline-none smooth-transition disabled:cursor-not-allowed disabled:bg-transparent disabled:text-[#8b98ad] dark:bg-[#111827] dark:text-slate-300 dark:disabled:bg-transparent dark:disabled:text-slate-500"
+              >
+                {refreshIntervals.map((option) => {
+                  return (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                    >
+                      {option.label}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
           </div>
         </div>
 
-        <nav className="flex flex-wrap gap-2 border-t border-[#e6eaf2] px-5 py-4 dark:border-[#263247]">
+        <nav ref={serviceTabListRef} className="relative flex flex-wrap gap-2 border-t border-[#e6eaf2] px-5 py-4 dark:border-[#263247]">
+          <span
+            aria-hidden="true"
+            className={`absolute rounded-lg bg-[#efecff] transition-[left,top,width,height,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[left,top,width,height] dark:bg-violet-500/15 ${
+              activeTabIndicator.ready ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{
+              left: activeTabIndicator.left,
+              top: activeTabIndicator.top,
+              width: activeTabIndicator.width,
+              height: activeTabIndicator.height,
+            }}
+          />
           {Object.entries(serviceAnalyticsLabels).map(([key, label]) => (
             <button
               key={key}
+              ref={(node) => {
+                serviceTabRefs.current[key as ServiceAnalyticsKey] = node;
+              }}
               type="button"
               onClick={() => setServiceKey(key as ServiceAnalyticsKey)}
-              className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+              className={`relative z-10 rounded-lg px-3 py-2 text-sm font-medium smooth-transition ${
                 key === serviceKey
-                  ? 'bg-[#efecff] text-[#4f3ee7] dark:bg-violet-500/15 dark:text-violet-200'
+                  ? 'text-[#4f3ee7] dark:text-violet-200'
                   : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
               }`}
             >
@@ -690,22 +792,13 @@ function EmbeddedServiceAnalyticsDashboard() {
       ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.requestRate} value={formatEmbeddedNumber(health?.request_rate)} suffix="req/s" helper="5m rolling rate" />
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.errorRate} value={formatEmbeddedPercent(health?.error_rate)} helper="HTTP 5xx + timeout" />
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.p95} value={formatEmbeddedNumber(health?.p95_latency_ms)} suffix="ms" helper="User-facing tail latency" />
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.p99} value={formatEmbeddedNumber(health?.p99_latency_ms)} suffix="ms" helper="Worst-case request latency" />
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.p50} value={formatEmbeddedNumber(health?.p50_latency_ms)} suffix="ms" helper="Median response time" />
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.p90} value={formatEmbeddedNumber(health?.p90_latency_ms)} suffix="ms" helper="High percentile trend" />
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.cpu} value={formatEmbeddedNumber(health?.cpu_usage)} suffix="cores" helper="Runtime utilization" />
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.memory} value={formatEmbeddedBytes(health?.memory_usage_bytes)} helper="Container memory usage" />
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.restarts} value={formatEmbeddedNumber(health?.pod_restarts_15m)} suffix="15m" helper="Recent pod stability" />
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.providerLatency} value={formatEmbeddedNumber(health?.provider_p95_latency_ms)} suffix="ms p95" helper="External provider latency" />
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.providerError} value={formatEmbeddedPercent(health?.provider_error_rate)} helper="External provider failure rate" />
-        <EmbeddedMetricCard loading={loading} meta={embeddedMetricMeta.updated} value={health ? formatEmbeddedDate(health.generated_at) : null} helper="Prometheus scrape timestamp" />
+        {metricCards.map((card) => (
+          <EmbeddedMetricCard key={card.key} loading={loading} meta={card.meta} value={card.value} suffix={card.suffix} helper={card.helper} />
+        ))}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
-        <article className="app-surface rounded-lg p-5">
+        <article className="app-surface card-smooth rounded-lg p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-base font-semibold text-[#111827] dark:text-slate-50">Signal coverage</h2>
@@ -737,7 +830,7 @@ function EmbeddedServiceAnalyticsDashboard() {
           </div>
         </article>
 
-        <article className="app-surface rounded-lg p-5">
+        <article className="app-surface card-smooth rounded-lg p-5">
           <div>
             <h2 className="text-base font-semibold text-[#111827] dark:text-slate-50">Prometheus queries</h2>
             <p className="mt-1 text-sm text-[#71809a] dark:text-slate-400">Raw PromQL used by the analytics agent for this service.</p>
@@ -788,7 +881,7 @@ function EmbeddedMetricCard({
   }[meta.tone];
 
   return (
-    <article className="app-surface min-h-36 rounded-lg p-5">
+    <article className="app-surface card-smooth min-h-36 rounded-lg p-5">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-semibold text-[#71809a] dark:text-slate-400">{meta.label}</p>
         <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${toneClass}`}>
@@ -796,8 +889,9 @@ function EmbeddedMetricCard({
         </span>
       </div>
       {loading ? (
-        <div className="mt-4 flex items-center gap-2 text-sm text-[#71809a] dark:text-slate-400">
-          <Loader2 className="size-4 animate-spin text-[#6246ea]" /> Loading
+        <div className="mt-4 space-y-3" aria-label={`Loading ${meta.label}`}>
+          <div className="skeleton h-8 w-28" />
+          <div className="skeleton h-3 w-36" />
         </div>
       ) : value ? (
         <p className="mt-4 text-2xl font-semibold text-[#111827] dark:text-slate-50">
@@ -812,15 +906,56 @@ function EmbeddedMetricCard({
   );
 }
 
+type EmbeddedMetricCardConfig = {
+  key: string;
+  meta: { label: string; icon: typeof Activity; tone: 'violet' | 'red' | 'amber' | 'slate' };
+  value: string | null;
+  suffix?: string;
+  helper: string;
+};
+
+function buildEmbeddedMetricCards(serviceKey: ServiceAnalyticsKey, health: ServiceHealthResponse | null): EmbeddedMetricCardConfig[] {
+  const commonCards: EmbeddedMetricCardConfig[] = [
+    { key: 'request_rate', meta: embeddedMetricMeta.requestRate, value: formatEmbeddedNumber(health?.request_rate), suffix: 'req/s', helper: '5m rolling rate' },
+    { key: 'error_rate', meta: embeddedMetricMeta.errorRate, value: formatEmbeddedPercent(health?.error_rate), helper: 'HTTP 5xx rate' },
+    { key: 'p95_latency_ms', meta: embeddedMetricMeta.p95, value: formatEmbeddedNumber(health?.p95_latency_ms), suffix: 'ms', helper: 'User-facing tail latency' },
+    { key: 'p99_latency_ms', meta: embeddedMetricMeta.p99, value: formatEmbeddedNumber(health?.p99_latency_ms), suffix: 'ms', helper: 'Worst-case request latency' },
+    { key: 'p50_latency_ms', meta: embeddedMetricMeta.p50, value: formatEmbeddedNumber(health?.p50_latency_ms), suffix: 'ms', helper: 'Median response time' },
+    { key: 'p90_latency_ms', meta: embeddedMetricMeta.p90, value: formatEmbeddedNumber(health?.p90_latency_ms), suffix: 'ms', helper: 'High percentile trend' },
+    { key: 'cpu_usage', meta: embeddedMetricMeta.cpu, value: formatEmbeddedNumber(health?.cpu_usage), suffix: 'cores', helper: 'Runtime CPU usage' },
+    { key: 'memory_usage_bytes', meta: embeddedMetricMeta.memory, value: formatEmbeddedBytes(health?.memory_usage_bytes), helper: 'Resident memory usage' },
+  ];
+
+  if (serviceKey === 'webhook') {
+    return [
+      ...commonCards,
+      { key: 'event_loop_lag_p99_ms', meta: embeddedMetricMeta.eventLoop, value: formatEmbeddedNumber(health?.event_loop_lag_p99_ms), suffix: 'ms', helper: 'Node.js event loop delay' },
+      { key: 'heap_used_bytes', meta: embeddedMetricMeta.heap, value: formatEmbeddedBytes(health?.heap_used_bytes), helper: 'Node.js heap memory used' },
+      { key: 'active_handles', meta: embeddedMetricMeta.handles, value: formatEmbeddedNumber(health?.active_handles), helper: 'Open Node.js handles' },
+      { key: 'process_uptime_seconds', meta: embeddedMetricMeta.uptime, value: formatEmbeddedDuration(health?.process_uptime_seconds), helper: 'Process uptime' },
+      { key: 'updated', meta: embeddedMetricMeta.updated, value: health ? formatEmbeddedDate(health.generated_at) : null, helper: 'Prometheus scrape timestamp' },
+    ];
+  }
+
+  return [
+    ...commonCards,
+    { key: 'pod_restarts_15m', meta: embeddedMetricMeta.restarts, value: formatEmbeddedNumber(health?.pod_restarts_15m), suffix: '15m', helper: 'Recent pod stability' },
+    { key: 'provider_p95_latency_ms', meta: embeddedMetricMeta.providerLatency, value: formatEmbeddedNumber(health?.provider_p95_latency_ms), suffix: 'ms p95', helper: 'External provider latency' },
+    { key: 'provider_error_rate', meta: embeddedMetricMeta.providerError, value: formatEmbeddedPercent(health?.provider_error_rate), helper: 'External provider failure rate' },
+    { key: 'updated', meta: embeddedMetricMeta.updated, value: health ? formatEmbeddedDate(health.generated_at) : null, helper: 'Prometheus scrape timestamp' },
+  ];
+}
+
 function EmbeddedStatusBadge({ status }: { status: ServiceHealthResponse['status'] }) {
+  const label = status === 'unknown' ? 'Checking' : status;
   const className = {
-    healthy: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300',
-    degraded: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300',
-    critical: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300',
-    unknown: 'border-[#e1e6ef] bg-[#f8faff] text-[#4f5d73] dark:border-[#263247] dark:bg-slate-800 dark:text-slate-300',
+    healthy: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
+    degraded: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
+    critical: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
+    unknown: 'bg-[#f8faff] text-[#4f5d73] dark:bg-slate-800 dark:text-slate-300',
   }[status];
 
-  return <span className={`w-fit rounded border px-3 py-1 text-sm font-medium ${className}`}>{status}</span>;
+  return <span className={`w-fit rounded px-3 py-1 text-sm font-medium capitalize ${className}`}>{label}</span>;
 }
 
 function formatEmbeddedNumber(value: number | null | undefined): string | null {
@@ -838,6 +973,17 @@ function formatEmbeddedBytes(value: number | null | undefined): string | null {
   return new Intl.NumberFormat('en', { maximumFractionDigits: 2, style: 'unit', unit: 'megabyte' }).format(value / 1024 / 1024);
 }
 
+function formatEmbeddedDuration(value: number | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const days = Math.floor(value / 86400);
+  const hours = Math.floor((value % 86400) / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
 function formatEmbeddedDate(value: string): string {
   return new Intl.DateTimeFormat('en', {
     dateStyle: 'medium',
@@ -850,7 +996,7 @@ function Metric({ title, value, icon: Icon }: { title: string; value: string; ic
     <motion.article
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="app-surface rounded-lg p-5"
+      className="app-surface card-smooth rounded-lg p-5"
     >
       <div className="flex items-center justify-between">
         <p className="app-muted text-sm font-medium">{title}</p>
@@ -878,20 +1024,10 @@ function executionPlanFor(key: string) {
       { title: 'Tune alert severity', detail: 'Separate warning, degraded, and critical paths to reduce noisy alerts.' },
       { title: 'Route incident ownership', detail: 'Attach each alert family to an owner, escalation path, and response playbook.' },
     ],
-    'root-cause': [
-      { title: 'Build dependency graph', detail: 'Map services, agents, providers, databases, queues, and external APIs.' },
-      { title: 'Correlate failures', detail: 'Join error spikes with latency, restart, provider, and workflow timing signals.' },
-      { title: 'Generate corrective actions', detail: 'Summarize likely root cause, evidence, blast radius, and next remediation steps.' },
-    ],
     decision: [
       { title: 'Define decision criteria', detail: 'Set impact, urgency, confidence, cost, and risk dimensions for scoring.' },
       { title: 'Create recommendation queue', detail: 'Convert analytics findings into ranked actions for operators and product teams.' },
       { title: 'Track decision outcomes', detail: 'Measure whether accepted recommendations improved reliability, revenue, or cycle time.' },
-    ],
-    optimization: [
-      { title: 'Audit agent routing', detail: 'Review delegation paths, duplicated work, and missed handoffs across agents.' },
-      { title: 'Detect redundancy', detail: 'Find overlapping tasks, repeated analysis, and low-value agent loops.' },
-      { title: 'Propose ecosystem changes', detail: 'Recommend routing updates, delegation rules, and workload balancing changes.' },
     ],
   };
 
@@ -922,23 +1058,11 @@ function dashboardSignalsFor(key: string) {
       { label: 'SLO state', value: 'Draft', detail: 'Service ownership pending', icon: CheckCircle2, tone: commonTone },
       { label: 'Run mode', value: 'Manual', detail: 'Start monitor when ready', icon: Terminal, tone: successTone },
     ],
-    'root-cause': [
-      { label: 'Correlations', value: '6', detail: 'Errors, latency, restarts', icon: GitBranch, tone: commonTone },
-      { label: 'Dependency graph', value: 'Draft', detail: 'Services and providers pending', icon: BarChart3, tone: warningTone },
-      { label: 'Open reports', value: '0', detail: 'No published RCA yet', icon: FileText, tone: commonTone },
-      { label: 'Evidence window', value: '24h', detail: 'Default incident lookback', icon: Clock3, tone: successTone },
-    ],
     decision: [
       { label: 'Recommendations', value: '0', detail: 'Decision queue not published', icon: Radar, tone: commonTone },
       { label: 'Scoring model', value: 'Draft', detail: 'Impact and confidence criteria', icon: SlidersHorizontal, tone: warningTone },
       { label: 'Risk inputs', value: '4', detail: 'Reliability, cost, latency, volume', icon: ShieldAlert, tone: commonTone },
       { label: 'Review cadence', value: 'Daily', detail: 'Ops decision summary target', icon: CheckCircle2, tone: successTone },
-    ],
-    optimization: [
-      { label: 'Routes', value: '13', detail: 'Agent routing paths tracked', icon: GitBranch, tone: commonTone },
-      { label: 'Redundancy checks', value: 'Pending', detail: 'Duplicate work detector', icon: SlidersHorizontal, tone: warningTone },
-      { label: 'Handoff quality', value: 'Draft', detail: 'Delegation policy needed', icon: Radar, tone: commonTone },
-      { label: 'Improvement plan', value: '0', detail: 'No published plan yet', icon: FileText, tone: successTone },
     ],
   };
 
@@ -948,7 +1072,7 @@ function dashboardSignalsFor(key: string) {
 function serviceCoverageFor(key: string) {
   const coverage: Record<string, Array<{ name: string; detail: string; status: 'Live' | 'Pending' | 'Draft' }>> = {
     system: [
-      { name: 'RC Service', detail: 'Prometheus metrics connected with fallback endpoint', status: 'Live' },
+      { name: 'RC Service', detail: 'Prometheus metrics connected to RC service scrape', status: 'Live' },
       { name: 'Challan Service', detail: 'Awaiting metrics route', status: 'Pending' },
       { name: 'Service History Service', detail: 'Awaiting metrics route', status: 'Pending' },
       { name: 'Fastag Service', detail: 'Awaiting metrics route', status: 'Pending' },
@@ -1086,7 +1210,7 @@ function actionWorkbenchFor(key: string, action: string) {
         { label: 'P95 latency', value: '49.8 ms' },
         { label: 'Coverage', value: '5/11 signals' },
       ],
-      steps: ['Keep RC fallback scrape visible for testing.', 'Add challan, service history, fastag, and payments metric URLs.', 'Promote missing signals as each service exposes Prometheus metrics.'],
+      steps: ['Keep RC metrics isolated to the RC service scrape.', 'Add challan, service history, fastag, payments, and webhook metric URLs.', 'Promote missing signals as each service exposes Prometheus metrics.'],
       href: '/analytics/system/rc',
       cta: 'Open full service analytics',
     },
@@ -1206,7 +1330,7 @@ function AgentStatusBadge({ status }: { status: AgentDisplayStatus }) {
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="app-surface rounded-lg p-5">
+    <section className="app-surface card-smooth rounded-lg p-5">
       <h2 className="app-heading mb-4 text-base font-semibold">{title}</h2>
       {children}
     </section>
