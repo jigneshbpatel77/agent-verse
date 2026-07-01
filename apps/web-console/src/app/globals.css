@@ -28,8 +28,8 @@ samp,
 }
 
 html.dark body {
-  background: #0b1020;
-  color: #e5e7eb;
+  background: var(--dark-bg);
+  color: var(--dark-text);
   color-scheme: dark;
 }
 
@@ -42,6 +42,29 @@ html:not(.dark) body {
   --motion-normal: 250ms;
   --motion-slow: 350ms;
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dark-bg: #0b1020;
+  --dark-shell: #0f172a;
+  --dark-surface: #111827;
+  --dark-surface-subtle: #0f172a;
+  --dark-elevated: #0f172a;
+  --dark-hover: #182338;
+  --dark-border: #263247;
+  --dark-border-soft: #263247;
+  --dark-text: #f1f5f9;
+  --dark-muted: #94a3b8;
+  --dark-muted-strong: #e2e8f0;
+  --dark-primary: #6246ea;
+  --dark-primary-hover: #7c3aed;
+  --dark-primary-soft: rgba(139, 92, 246, 0.15);
+  --dark-primary-border: rgba(139, 92, 246, 0.4);
+  --dark-primary-muted: #ddd6fe;
+  --chart-primary: #6246ea;
+  --chart-primary-fill: #6246ea;
+}
+
+html.dark {
+  --chart-primary: var(--dark-primary);
+  --chart-primary-fill: var(--dark-primary);
 }
 
 @keyframes page-enter {
@@ -88,7 +111,13 @@ html:not(.dark) body {
 
 @layer components {
   .app-surface {
-    @apply border border-[#e6eaf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-[#263247] dark:bg-[#111827] dark:shadow-none;
+    @apply border border-[#e6eaf2] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-[var(--dark-border-soft)] dark:bg-[var(--dark-surface)] dark:shadow-none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.04 0 0 0 0 0.05 0 0 0 0 0.07 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.72),
+      inset 1px 0 0 rgba(255, 255, 255, 0.28),
+      0 8px 24px rgba(15, 23, 42, 0.05);
     transition:
       background-color var(--motion-normal) var(--motion-ease),
       border-color var(--motion-normal) var(--motion-ease),
@@ -97,7 +126,12 @@ html:not(.dark) body {
   }
 
   .app-surface-subtle {
-    @apply border border-[#e6eaf2] bg-white dark:border-[#263247] dark:bg-[#0f172a];
+    @apply border border-[#e6eaf2] bg-white dark:border-[var(--dark-border-soft)] dark:bg-[var(--dark-surface-subtle)];
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.04 0 0 0 0 0.05 0 0 0 0 0.07 0 0 0 .065 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.62),
+      inset 1px 0 0 rgba(255, 255, 255, 0.22);
     transition:
       background-color var(--motion-normal) var(--motion-ease),
       border-color var(--motion-normal) var(--motion-ease),
@@ -106,19 +140,19 @@ html:not(.dark) body {
   }
 
   .app-muted {
-    @apply text-slate-500 dark:text-slate-400;
+    @apply text-slate-500 dark:text-[var(--dark-muted)];
   }
 
   .app-muted-strong {
-    @apply text-slate-700 dark:text-slate-200;
+    @apply text-slate-700 dark:text-[var(--dark-muted-strong)];
   }
 
   .app-heading {
-    @apply text-slate-950 dark:text-slate-100;
+    @apply text-slate-950 dark:text-[var(--dark-text)];
   }
 
   .app-button-secondary {
-    @apply border border-[#e1e6ef] bg-white text-[#111827] hover:bg-[#f8faff] dark:border-[#263247] dark:bg-[#0f172a] dark:text-slate-100 dark:hover:bg-[#182338];
+    @apply border border-[#e1e6ef] bg-white text-[#111827] hover:bg-[#f8faff] dark:border-[var(--dark-border)] dark:bg-[var(--dark-elevated)] dark:text-[var(--dark-text)] dark:hover:bg-[var(--dark-hover)];
     transition:
       background-color var(--motion-normal) var(--motion-ease),
       border-color var(--motion-normal) var(--motion-ease),
@@ -132,7 +166,7 @@ html:not(.dark) body {
   }
 
   .app-button-primary {
-    @apply bg-gradient-to-r from-[#5b4cf6] to-[#7b2eea] text-white shadow-sm shadow-[#6246ea]/20 hover:from-[#5142e8] hover:to-[#6f26dc] disabled:from-slate-300 disabled:to-slate-300 disabled:text-white disabled:shadow-none dark:disabled:from-[#263247] dark:disabled:to-[#263247] dark:disabled:text-slate-500;
+    @apply bg-gradient-to-r from-[#5b4cf6] to-[#7b2eea] text-white shadow-sm shadow-[#6246ea]/20 hover:from-[#5142e8] hover:to-[#6f26dc] disabled:from-slate-300 disabled:to-slate-300 disabled:text-white disabled:shadow-none dark:disabled:text-[var(--dark-muted)];
     transition:
       background-color var(--motion-normal) var(--motion-ease),
       border-color var(--motion-normal) var(--motion-ease),
@@ -144,6 +178,43 @@ html:not(.dark) body {
 
   .app-button-primary:active:not(:disabled) {
     transform: translateY(1px);
+  }
+
+  html.dark .app-button-primary {
+    background-image: linear-gradient(to right, #5b4cf6, #7b2eea);
+    box-shadow: 0 1px 2px rgba(98, 70, 234, 0.2);
+  }
+
+  html.dark .app-button-primary:hover:not(:disabled) {
+    background-image: linear-gradient(to right, #5142e8, #6f26dc);
+  }
+
+  html.dark .app-button-primary:disabled {
+    background-image: linear-gradient(to right, #263247, #263247);
+    box-shadow: none;
+  }
+
+  html.dark .app-surface {
+    border-color: rgba(148, 163, 184, 0.13);
+    background-color: #0b1220;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.18 0 0 0 0 0.21 0 0 0 0 0.27 0 0 0 .022 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.045),
+      inset 1px 0 0 rgba(255, 255, 255, 0.018),
+      inset -1px 0 0 rgba(255, 255, 255, 0.01),
+      inset 0 -1px 0 rgba(2, 6, 23, 0.5);
+  }
+
+  html.dark .app-surface-subtle {
+    border-color: rgba(148, 163, 184, 0.11);
+    background-color: #0a111e;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.16 0 0 0 0 0.19 0 0 0 0 0.25 0 0 0 .016 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.032),
+      inset 1px 0 0 rgba(255, 255, 255, 0.014),
+      inset 0 -1px 0 rgba(2, 6, 23, 0.42);
   }
 
   .smooth-transition {

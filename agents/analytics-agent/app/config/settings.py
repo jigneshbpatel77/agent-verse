@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     temporal_address: str = Field(alias="TEMPORAL_ADDRESS")
     openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
+    ai_provider: str = Field(default="deterministic", alias="AI_PROVIDER")
+    provider_api_key: Optional[str] = Field(default=None, alias="PROVIDER_API_KEY")
+    openrouter_model: str = Field(default="openrouter/auto", alias="OPENROUTER_MODEL")
+    openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL")
+    commander_llm_timeout_seconds: float = Field(default=30, alias="COMMANDER_LLM_TIMEOUT_SECONDS", ge=1)
     otel_exporter_otlp_endpoint: str = Field(alias="OTEL_EXPORTER_OTLP_ENDPOINT")
     jwt_secret: str = Field(alias="JWT_SECRET")
     prometheus_url: str = Field(default="http://localhost:9090", alias="PROMETHEUS_URL")
@@ -121,6 +126,7 @@ class Settings(BaseSettings):
         "alert_webhook_url",
         "openai_api_key",
         "anthropic_api_key",
+        "provider_api_key",
         "openai_base_url",
         "xai_api_key",
         "aws_access_key_id",

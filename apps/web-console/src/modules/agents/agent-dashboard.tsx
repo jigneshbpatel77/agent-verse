@@ -9,10 +9,12 @@ import {
   AlertCircle,
   AlertTriangle,
   BarChart3,
+  Bot,
   CheckCircle2,
   Clock3,
   Cpu,
   Database,
+  Download,
   FileText,
   Gauge,
   HardDrive,
@@ -21,6 +23,7 @@ import {
   Play,
   Radar,
   RotateCcw,
+  Send,
   Server,
   ShieldAlert,
   SlidersHorizontal,
@@ -31,6 +34,7 @@ import {
 } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ApiClient } from '@/api/client';
+import { AnimatedMetricValue } from '@/components/animated-metric-value';
 import { runtimeConfig } from '@/config/runtime';
 import { MonitoringAgentControl } from '@/modules/analytics/monitoring-agent-control';
 import { agents, getAgent, summaryTrend } from '@/modules/dashboard/data';
@@ -112,9 +116,11 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
   const isPaused = Boolean(pausedAgents[agentKey]);
   const displayStatus = isPaused ? 'Paused' : normalizeAgentStatus(agent.status);
   const isAnalyticsAgent = agentKey === 'analytics';
-  const activeAnalyticsKey = analyticsResponsibilities.some((responsibility) => responsibility.key === selectedAnalyticsTab)
+  const activeAnalyticsKey = selectedAnalyticsTab === 'dashboard'
+    ? 'dashboard'
+    : analyticsResponsibilities.some((responsibility) => responsibility.key === selectedAnalyticsTab)
     ? selectedAnalyticsTab
-    : analyticsResponsibilities[0].key;
+    : 'dashboard';
   const activeResponsibility =
     analyticsResponsibilities.find((responsibility) => responsibility.key === activeAnalyticsKey) ?? analyticsResponsibilities[0];
 
@@ -155,14 +161,16 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
               {isPaused ? <Play className="size-4" /> : <Pause className="size-4" />}
               {isPaused ? 'Resume Agent' : 'Pause Agent'}
             </button>
-            <button className="app-button-primary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold">
-              <Terminal className="size-4" /> View Logs
-            </button>
+            {!isAnalyticsAgent ? (
+              <button className="app-button-primary inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold">
+                <Terminal className="size-4" /> View Logs
+              </button>
+            ) : null}
           </div>
         </div>
 
         {!isAnalyticsAgent ? (
-          <div className="mt-5 flex gap-2 overflow-x-auto border-t border-[#e6eaf2] pt-4 dark:border-[#263247]">
+          <div className="mt-5 flex gap-2 overflow-x-auto border-t border-[#e6eaf2] pt-4 dark:border-[var(--dark-border)]">
             {tabs.map((tab) => {
               const active = tab === 'Overview';
               return (
@@ -171,8 +179,8 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
                   type="button"
                   className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${
                     active
-                      ? 'bg-[#efecff] text-[#4f3ee7] dark:bg-violet-500/15 dark:text-violet-200'
-                      : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
+                      ? 'bg-[#efecff] text-[#4f3ee7] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]'
+                      : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-[var(--dark-muted-strong)] dark:hover:bg-[var(--dark-hover)] dark:hover:text-[var(--dark-primary-muted)]'
                   }`}
                 >
                   <span className="inline-flex items-center gap-2">{tab}</span>
@@ -184,7 +192,11 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
       </section>
 
       {isAnalyticsAgent ? (
-        <AnalyticsResponsibilityView responsibility={activeResponsibility} />
+        activeAnalyticsKey === 'dashboard' ? (
+          <AnalyticsCommanderDashboard agentPaused={isPaused} />
+        ) : (
+          <AnalyticsResponsibilityView responsibility={activeResponsibility} agentPaused={isPaused} />
+        )
       ) : (
         <>
       <section className="grid gap-4 md:grid-cols-4">
@@ -201,14 +213,14 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
               <AreaChart data={summaryTrend}>
                 <defs>
                   <linearGradient id="agentPerformance" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="#6246ea" stopOpacity={0.26} />
-                    <stop offset="100%" stopColor="#6246ea" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--chart-primary-fill)" stopOpacity={0.26} />
+                    <stop offset="100%" stopColor="var(--chart-primary-fill)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="label" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} />
                 <Tooltip />
-                <Area type="monotone" dataKey="tasks" stroke="#6246ea" fill="url(#agentPerformance)" strokeWidth={2} />
+                <Area type="monotone" dataKey="tasks" stroke="var(--chart-primary)" fill="url(#agentPerformance)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -265,7 +277,532 @@ export function AgentDashboard({ agentKey, showServiceAnalyticsAction = false }:
   );
 }
 
-function AnalyticsResponsibilityView({ responsibility }: { responsibility: (typeof analyticsResponsibilities)[number] }) {
+const commanderPromptExamples = [
+  'Check if RC analytics is healthy.',
+  'Give me yesterday crash report.',
+  'Which VehicleInfo service is slow right now?',
+  'Summarize Firebase app signals and issues.',
+];
+const commanderPromptMaxLength = 2000;
+
+function AnalyticsCommanderDashboard({ agentPaused }: { agentPaused: boolean }) {
+  const [prompt, setPrompt] = useState('');
+  const [result, setResult] = useState<CommanderQueryResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const remainingPromptChars = commanderPromptMaxLength - prompt.length;
+  const isPromptOverLimit = remainingPromptChars <= 0;
+
+  async function runCommander() {
+    const normalizedPrompt = prompt.trim();
+    if (!normalizedPrompt || loading || isPromptOverLimit || agentPaused) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const client = new ApiClient({ baseUrl: window.location.origin });
+      const payload = await client.post<CommanderQueryResponse>('/api/analytics-agent/api/v1/commander/query', {
+        prompt: normalizedPrompt,
+        days: 7,
+      });
+      setResult(payload);
+    } catch (unknownError) {
+      setError(unknownError instanceof Error ? unknownError.message : 'Commander analysis failed.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <section className="app-surface rounded-lg p-4">
+        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start">
+          <div className="min-w-0 flex-1">
+            <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#efecff] text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
+                  <Bot className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#6246ea] dark:text-[var(--dark-primary-muted)]">Analytics Commander</p>
+                  <h2 className="truncate text-xl font-semibold text-[#111827] dark:text-[var(--dark-text)]">Ask across connected analytics</h2>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {['System', 'Firebase', 'Crashlytics', 'CloudWatch'].map((source) => (
+                  <span
+                    key={source}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#f4f1ff] px-2.5 py-1 text-xs font-semibold text-[#5b4cf6] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]"
+                  >
+                    <span className="size-1.5 rounded-full bg-emerald-400" />
+                    {source}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-[#dfe5f0] bg-white shadow-sm dark:border-[var(--dark-border)] dark:bg-[var(--dark-bg)]">
+              <div className="relative p-3">
+                <textarea
+                  id="analytics-commander-prompt"
+                  value={prompt}
+                  onChange={(event) => setPrompt(event.target.value)}
+                  rows={3}
+                  placeholder="Ask anything: Is RC healthy? Which service is slow? Give me yesterday crash report."
+                  className="min-h-20 w-full resize-none bg-transparent px-1 py-1 pr-16 text-sm leading-6 text-[#111827] outline-none placeholder:text-[#8a97ad] dark:text-[var(--dark-text)] dark:placeholder:text-[var(--dark-muted)]"
+                />
+                <span
+                  className={`pointer-events-none absolute bottom-3 right-3 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    isPromptOverLimit
+                      ? 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300'
+                      : remainingPromptChars <= commanderPromptMaxLength * 0.1
+                      ? 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300'
+                      : 'bg-slate-100 text-[#71809a] dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted)]'
+                  }`}
+                >
+                  {remainingPromptChars}
+                </span>
+              </div>
+              <div className="flex flex-col gap-3 border-t border-[#e6eaf2] p-3 dark:border-[var(--dark-border)] lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap gap-2">
+                  {commanderPromptExamples.map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => setPrompt(example)}
+                      className="rounded-full bg-[#f4f1ff] px-3 py-1.5 text-xs font-semibold text-[#5b4cf6] transition hover:bg-[#ebe6ff] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)] dark:hover:bg-[var(--dark-hover)]"
+                    >
+                      {example}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex shrink-0 items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={runCommander}
+                    disabled={loading || prompt.trim().length < 3 || isPromptOverLimit || agentPaused}
+                    className="app-button-primary inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                    {agentPaused ? 'Paused' : loading ? 'Analyzing' : 'Run'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <CommanderResultPanel result={result} loading={loading} error={error} />
+    </div>
+  );
+}
+
+function CommanderResultPanel({
+  result,
+  loading,
+  error,
+}: {
+  result: CommanderQueryResponse | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  const stats = result ? commanderStats(result) : null;
+
+  return (
+    <section className="app-surface min-h-[280px] rounded-lg p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#6246ea] dark:text-[var(--dark-primary-muted)]">Analysis result</p>
+          <h3 className="mt-1 text-lg font-semibold text-[#111827] dark:text-[var(--dark-text)]">Commander response</h3>
+        </div>
+        {result ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#e6eaf2] bg-[#fbfcff]/70 px-2.5 py-2 dark:border-[var(--dark-border)] dark:bg-[var(--dark-elevated)]">
+              <span className="rounded-full bg-[#efecff] px-2.5 py-1 text-xs font-semibold text-[#5b4cf6] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
+                {result.ai_provider === 'openrouter' ? `OpenRouter${result.ai_model ? ` · ${result.ai_model}` : ''}` : 'Deterministic'}
+              </span>
+              <span className="app-muted text-xs font-semibold">{new Date(result.generated_at).toLocaleString()}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => downloadCommanderReport(result)}
+              className="app-button-secondary inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3.5 text-xs font-semibold"
+            >
+              <Download className="size-4" />
+              Export HTML
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {loading ? (
+        <div className="mt-4 grid gap-3">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="skeleton h-20 rounded-lg" />
+            <div className="skeleton h-20 rounded-lg" />
+            <div className="skeleton h-20 rounded-lg" />
+            <div className="skeleton h-20 rounded-lg" />
+          </div>
+          <div className="skeleton h-40 rounded-lg" />
+        </div>
+      ) : error ? (
+        <div className="mt-4 rounded-lg bg-rose-50 p-4 text-sm font-medium text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/60">
+          {error}
+        </div>
+      ) : result && stats ? (
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+            <article className="app-surface-subtle rounded-lg p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="app-muted text-xs font-semibold uppercase tracking-wide">Verdict</p>
+                  <CommanderAnswer result={result} />
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${stats.verdictClass}`}>{stats.verdictLabel}</span>
+              </div>
+            </article>
+
+            <div className="grid grid-cols-2 gap-3">
+              <CommanderSourcesStat sources={result.data_sources} />
+              <CommanderStat label="Signals" value={`${stats.availableMetricCount}/${stats.metricCount}`} detail="available metrics" tone={stats.availableMetricCount ? 'healthy' : 'warning'} />
+              <CommanderStat label="Findings" value={String(stats.findingCount)} detail={`${stats.criticalCount} critical`} tone={stats.findingCount ? 'warning' : 'healthy'} />
+              <CommanderStat label="Next steps" value={String(stats.actionCount)} detail={`${stats.limitationCount} known limits`} tone={stats.limitationCount ? 'warning' : 'healthy'} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.42fr)]">
+            <div className="space-y-4">
+              {result.sections.map((section) => (
+                <article key={section.title} className="app-surface-subtle rounded-lg p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-base font-semibold text-[#111827] dark:text-[var(--dark-text)]">{section.title}</h4>
+                      <p className="app-muted mt-1 text-sm">{section.summary}</p>
+                    </div>
+                    <span className="rounded-full bg-[#f4f1ff] px-2.5 py-1 text-xs font-semibold text-[#5b4cf6] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
+                      {section.metrics.length} metrics
+                    </span>
+                  </div>
+                  {section.metrics.length ? (
+                    <div className="mt-4 grid gap-2 md:grid-cols-2 2xl:grid-cols-5">
+                      {section.metrics.map((metric) => (
+                        <div key={`${section.title}-${metric.label}`} className="app-surface-subtle rounded-lg px-3 py-2.5">
+                          <p className="app-muted truncate text-xs font-semibold">{metric.label}</p>
+                          <p className={`mt-1 truncate text-base font-semibold ${commanderToneClass(metric.tone)}`}>{metric.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {section.evidence.length ? (
+                    <div className="mt-4 grid gap-2 lg:grid-cols-2">
+                      {section.evidence.map((item) => (
+                        <CommanderEvidenceItem key={item} item={item} />
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+
+            <aside className="space-y-4">
+              <CommanderList title="Findings" count={result.findings.length} items={result.findings.map((finding) => `${finding.title}: ${finding.detail}`)} empty="No findings from connected signals." />
+              <CommanderList title="Recommended actions" count={result.recommended_actions.length} items={result.recommended_actions} empty="No action required from current signals." />
+              <CommanderList title="Limitations" count={result.limitations.length} items={result.limitations} empty="No source limitations reported." />
+            </aside>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 grid min-h-[180px] place-items-center rounded-lg border border-dashed border-[#dfe5f0] bg-[#fbfcff]/70 p-6 text-center dark:border-[var(--dark-border)] dark:bg-[var(--dark-bg)]">
+          <div>
+            <Bot className="mx-auto size-10 text-[#8b5cf6]" />
+            <p className="mt-3 text-base font-semibold text-[#111827] dark:text-[var(--dark-text)]">Ask a production analytics question</p>
+            <p className="app-muted mt-1 max-w-xl text-sm">The commander will inspect connected System Analytics, Firebase app signals, and monitoring data, then return evidence-backed findings.</p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CommanderSourcesStat({ sources }: { sources: string[] }) {
+  return (
+    <div className="app-surface-subtle rounded-lg p-3">
+      <p className="app-muted text-xs font-semibold uppercase tracking-wide">Sources</p>
+      <p className="mt-2 text-2xl font-semibold text-[#6246ea] dark:text-[var(--dark-primary-muted)]">{sources.length}</p>
+      <div className="mt-2 space-y-1">
+        {sources.length ? (
+          sources.slice(0, 3).map((source) => (
+            <div key={source} className="flex items-center gap-2 text-xs font-semibold text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">
+              <span className="size-1.5 shrink-0 rounded-full bg-emerald-400" />
+              <span className="truncate">{source}</span>
+            </div>
+          ))
+        ) : (
+          <p className="app-muted text-xs">No connected sources</p>
+        )}
+        {sources.length > 3 ? <p className="app-muted text-xs">+{sources.length - 3} more</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function CommanderAnswer({ result }: { result: CommanderQueryResponse }) {
+  const points = commanderAnswerPoints(result.answer);
+  const keyMetrics = commanderKeyMetrics(result);
+
+  return (
+    <div className="mt-2 space-y-4">
+      <p className="text-lg font-semibold leading-7 text-[#111827] dark:text-[var(--dark-text)]">{points[0] ?? result.answer}</p>
+      {points.length > 1 ? (
+        <div className="grid gap-2 md:grid-cols-2">
+          {points.slice(1, 5).map((point) => (
+            <div key={point} className="app-surface-subtle rounded-md px-3 py-2 text-xs leading-5 text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">
+              {point}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {keyMetrics.length ? (
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {keyMetrics.map((metric) => (
+            <div key={`${metric.label}-${metric.value}`} className="rounded-md bg-[#f8f6ff] px-3 py-2 ring-1 ring-[#e6eaf2]/80 dark:bg-[var(--dark-primary-soft)] dark:ring-[var(--dark-primary-border)]">
+              <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-[#71809a] dark:text-[var(--dark-muted)]">{metric.label}</p>
+              <p className={`mt-1 truncate text-sm font-semibold ${commanderToneClass(metric.tone)}`}>{metric.value}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CommanderStat({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone: CommanderTone;
+}) {
+  return (
+    <div className="app-surface-subtle rounded-lg p-3">
+      <p className="app-muted text-xs font-semibold uppercase tracking-wide">{label}</p>
+      <p className={`mt-2 text-2xl font-semibold ${commanderToneClass(tone)}`}>{value}</p>
+      <p className="app-muted mt-1 truncate text-xs">{detail}</p>
+    </div>
+  );
+}
+
+function CommanderList({ title, count, items, empty }: { title: string; count: number; items: string[]; empty: string }) {
+  return (
+    <article className="app-surface-subtle rounded-lg p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="text-sm font-semibold text-[#111827] dark:text-[var(--dark-text)]">{title}</h4>
+        <span className="rounded-full bg-[#f4f1ff] px-2 py-0.5 text-xs font-semibold text-[#5b4cf6] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">{count}</span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {items.length ? (
+          items.slice(0, 5).map((item) => (
+            <p key={item} className="app-surface-subtle rounded-md px-3 py-2 text-xs leading-5 text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">
+              {item}
+            </p>
+          ))
+        ) : (
+          <p className="app-muted text-xs">{empty}</p>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function CommanderEvidenceItem({ item }: { item: string }) {
+  const [label, ...rest] = item.split(':');
+  const detail = rest.join(':').trim();
+
+  return (
+    <div className="app-surface-subtle rounded-md px-3 py-2">
+      {detail ? (
+        <>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#71809a] dark:text-[var(--dark-muted)]">{label}</p>
+          <p className="mt-1 text-xs leading-5 text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">{detail}</p>
+        </>
+      ) : (
+        <p className="text-xs leading-5 text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">{item}</p>
+      )}
+    </div>
+  );
+}
+
+function downloadCommanderReport(result: CommanderQueryResponse) {
+  const generatedAt = new Date(result.generated_at);
+  const timestamp = generatedAt.toLocaleString();
+  const fileTimestamp = generatedAt.toISOString().replace(/[:.]/g, '-');
+  const html = buildCommanderReportHtml(result, timestamp);
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `analytics-commander-report-${fileTimestamp}.html`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildCommanderReportHtml(result: CommanderQueryResponse, generatedAt: string) {
+  const metrics = result.sections.flatMap((section) =>
+    section.metrics.map((metric) => ({
+      source: section.title,
+      ...metric,
+    })),
+  );
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Analytics Commander Report</title>
+  <style>
+    body { margin: 0; background: #0b1020; color: #e5e7eb; font-family: Inter, Arial, sans-serif; }
+    main { max-width: 1120px; margin: 0 auto; padding: 32px; }
+    .card { border: 1px solid #263247; border-radius: 14px; background: #111827; padding: 20px; margin: 16px 0; }
+    .eyebrow { color: #c4b5fd; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    h1, h2 { margin: 6px 0 10px; }
+    p { color: #cbd5e1; line-height: 1.55; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .item { border: 1px solid #263247; border-radius: 10px; padding: 12px; background: #0f172a; }
+    .label { color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+    .value { color: #fff; font-size: 20px; font-weight: 800; margin-top: 6px; }
+    ul { margin: 8px 0 0 18px; padding: 0; color: #cbd5e1; }
+    li { margin: 8px 0; }
+    code { color: #ddd6fe; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="card">
+      <div class="eyebrow">Analytics Commander Report</div>
+      <h1>${escapeHtml(result.prompt)}</h1>
+      <p><strong>Generated:</strong> ${escapeHtml(generatedAt)} · <strong>Provider:</strong> ${escapeHtml(result.ai_provider)}${result.ai_model ? ` / ${escapeHtml(result.ai_model)}` : ''}</p>
+      <p><strong>Verdict:</strong> ${escapeHtml(result.answer)}</p>
+    </section>
+
+    <section class="card">
+      <div class="eyebrow">Connected Sources</div>
+      <div class="grid">
+        ${result.data_sources.length ? result.data_sources.map((source) => `<div class="item"><div class="label">Source</div><div class="value">${escapeHtml(source)}</div></div>`).join('') : '<p>No connected sources.</p>'}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="eyebrow">Metrics</div>
+      <div class="grid">
+        ${metrics.map((metric) => `<div class="item"><div class="label">${escapeHtml(metric.source)} / ${escapeHtml(metric.label)}</div><div class="value">${escapeHtml(metric.value)}</div></div>`).join('')}
+      </div>
+    </section>
+
+    ${result.sections.map((section) => `<section class="card"><div class="eyebrow">${escapeHtml(section.title)}</div><h2>${escapeHtml(section.summary)}</h2>${section.evidence.length ? `<ul>${section.evidence.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}</section>`).join('')}
+
+    <section class="card">
+      <div class="eyebrow">Findings</div>
+      ${result.findings.length ? `<ul>${result.findings.map((finding) => `<li><strong>${escapeHtml(finding.title)}:</strong> ${escapeHtml(finding.detail)}</li>`).join('')}</ul>` : '<p>No findings from connected signals.</p>'}
+    </section>
+
+    <section class="card">
+      <div class="eyebrow">Recommended Actions</div>
+      ${result.recommended_actions.length ? `<ul>${result.recommended_actions.map((action) => `<li>${escapeHtml(action)}</li>`).join('')}</ul>` : '<p>No action required from current signals.</p>'}
+    </section>
+
+    <section class="card">
+      <div class="eyebrow">Limitations</div>
+      ${result.limitations.length ? `<ul>${result.limitations.map((limit) => `<li>${escapeHtml(limit)}</li>`).join('')}</ul>` : '<p>No source limitations reported.</p>'}
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
+function escapeHtml(value: string | number | null | undefined) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function commanderAnswerPoints(answer: string) {
+  const normalized = answer
+    .replace(/\s+/g, ' ')
+    .replace(/\s*;\s*/g, '. ')
+    .trim();
+  const sentences = normalized
+    .split(/(?<=\.)\s+/)
+    .map((sentence) => sentence.replace(/^[-•]\s*/, '').trim())
+    .filter(Boolean);
+
+  if (sentences.length <= 1) {
+    return normalized ? [normalized] : [];
+  }
+
+  return sentences.slice(0, 5);
+}
+
+function commanderKeyMetrics(result: CommanderQueryResponse) {
+  const unavailableValues = new Set(['Not available', 'Unknown', '']);
+  return result.sections
+    .flatMap((section) => section.metrics)
+    .filter((metric) => !unavailableValues.has(metric.value))
+    .slice(0, 4);
+}
+
+function commanderStats(result: CommanderQueryResponse) {
+  const metrics = result.sections.flatMap((section) => section.metrics);
+  const unavailableValues = new Set(['Not available', 'Unknown', '']);
+  const availableMetricCount = metrics.filter((metric) => !unavailableValues.has(metric.value)).length;
+  const criticalCount = result.findings.filter((finding) => finding.severity === 'critical').length;
+  const warningCount = result.findings.filter((finding) => finding.severity === 'warning' || finding.severity === 'unknown').length;
+
+  return {
+    sourceCount: result.data_sources.length,
+    metricCount: metrics.length,
+    availableMetricCount,
+    findingCount: result.findings.length,
+    actionCount: result.recommended_actions.length,
+    limitationCount: result.limitations.length,
+    criticalCount,
+    verdictLabel: criticalCount ? 'Critical' : warningCount ? 'Review needed' : 'Healthy',
+    verdictClass: criticalCount
+      ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/35 dark:text-rose-300'
+      : warningCount
+      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/35 dark:text-amber-300'
+      : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+  };
+}
+
+function commanderToneClass(tone: CommanderTone) {
+  if (tone === 'healthy') return 'text-emerald-700 dark:text-emerald-300';
+  if (tone === 'warning') return 'text-amber-700 dark:text-amber-300';
+  if (tone === 'critical') return 'text-rose-700 dark:text-rose-300';
+  if (tone === 'unknown') return 'text-slate-500 dark:text-[var(--dark-muted)]';
+  return 'text-[#6246ea] dark:text-[var(--dark-primary-muted)]';
+}
+
+function AnalyticsResponsibilityView({
+  responsibility,
+  agentPaused,
+}: {
+  responsibility: (typeof analyticsResponsibilities)[number];
+  agentPaused: boolean;
+}) {
   const Icon = responsibility.icon;
   const plan = executionPlanFor(responsibility.key);
   const signalCards = dashboardSignalsFor(responsibility.key);
@@ -273,14 +810,14 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
   const insightRows = insightRowsFor(responsibility.key);
 
   if (responsibility.key === 'system') {
-    return <EmbeddedServiceAnalyticsDashboard />;
+    return <EmbeddedServiceAnalyticsDashboard agentPaused={agentPaused} />;
   }
 
   if (responsibility.key === 'monitoring') {
     return (
       <div className="space-y-5">
-        <FirebaseSignalsPanel />
-        <MonitoringAgentControl embedded />
+        <FirebaseSignalsPanel agentPaused={agentPaused} />
+        <MonitoringAgentControl embedded agentPaused={agentPaused} />
       </div>
     );
   }
@@ -293,7 +830,7 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="app-muted text-sm font-semibold">{metric.label}</p>
-                <p className="mt-3 text-2xl font-semibold text-[#111827] dark:text-slate-100">{metric.value}</p>
+                <p className="mt-3 text-2xl font-semibold text-[#111827] dark:text-[var(--dark-text)]">{metric.value}</p>
                 <p className="app-muted mt-1 text-xs">{metric.detail}</p>
               </div>
               <div className={`grid size-10 place-items-center rounded-lg ${metric.tone}`}>
@@ -308,23 +845,23 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
         <article className="app-surface card-smooth rounded-lg p-5">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex gap-4">
-              <div className="grid size-14 shrink-0 place-items-center rounded-xl bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
+              <div className="grid size-14 shrink-0 place-items-center rounded-xl bg-[#efecff] text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
                 <Icon className="size-7" />
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-semibold text-[#111827] dark:text-slate-100">{responsibility.title}</h2>
+                  <h2 className="text-xl font-semibold text-[#111827] dark:text-[var(--dark-text)]">{responsibility.title}</h2>
                   <span
                     className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                       responsibility.status === 'In progress'
                         ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                        : 'bg-slate-100 text-[#4f5d73] dark:bg-slate-800 dark:text-slate-300'
+                        : 'bg-slate-100 text-[#4f5d73] dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]'
                     }`}
                   >
                     {responsibility.status}
                   </span>
                 </div>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-[#4f5d73] dark:text-slate-300">{responsibility.summary}</p>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">{responsibility.summary}</p>
               </div>
             </div>
 
@@ -340,19 +877,19 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
               <div className="mt-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-base font-semibold text-[#111827] dark:text-slate-100">Service-wise analytics</h3>
+                    <h3 className="text-base font-semibold text-[#111827] dark:text-[var(--dark-text)]">Service-wise analytics</h3>
                     <p className="app-muted mt-1 text-sm">Front-page signal status for every VehicleInfo service.</p>
                   </div>
-                  <span className="rounded-full bg-[#efecff] px-2.5 py-1 text-xs font-semibold text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
+                  <span className="rounded-full bg-[#efecff] px-2.5 py-1 text-xs font-semibold text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
                     1/5 live
                   </span>
                 </div>
                 <div className="mt-4 grid gap-3 lg:grid-cols-2 2xl:grid-cols-5">
                   {serviceAnalyticsCardsForSystem().map((service) => (
-                    <article key={service.name} className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[#263247] dark:bg-[#0f172a]">
+                    <article key={service.name} className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <h4 className="text-sm font-semibold text-[#111827] dark:text-slate-100">{service.name}</h4>
+                          <h4 className="text-sm font-semibold text-[#111827] dark:text-[var(--dark-text)]">{service.name}</h4>
                           <p className="app-muted mt-1 text-xs">{service.detail}</p>
                         </div>
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${coverageStatusClass(service.status)}`}>{service.status}</span>
@@ -361,12 +898,12 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
                         {service.metrics.map((metric) => (
                           <div key={metric.label} className="flex items-center justify-between gap-3 text-xs">
                             <span className="app-muted font-semibold">{metric.label}</span>
-                            <span className="font-semibold text-[#111827] dark:text-slate-100">{metric.value}</span>
+                            <span className="font-semibold text-[#111827] dark:text-[var(--dark-text)]">{metric.value}</span>
                           </div>
                         ))}
                       </div>
                       {service.href ? (
-                        <Link href={service.href} className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-[#6246ea] hover:text-[#4f3ee7] dark:text-violet-300 dark:hover:text-violet-200">
+                        <Link href={service.href} className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-[#6246ea] hover:text-[#4f3ee7] dark:text-[var(--dark-primary-muted)] dark:hover:text-[var(--dark-primary-muted)]">
                           <BarChart3 className="size-3.5" /> Open RC details
                         </Link>
                       ) : null}
@@ -384,9 +921,9 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
             </>
           ) : (
             <div className="mt-5 grid gap-3 lg:grid-cols-[0.8fr_1.2fr]">
-              <div className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[#263247] dark:bg-[#0f172a]">
-                <p className="text-xs font-bold uppercase tracking-wide text-[#71809a] dark:text-slate-400">Primary deliverable</p>
-                <p className="mt-2 text-sm font-semibold text-[#111827] dark:text-slate-100">{responsibility.output}</p>
+              <div className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
+                <p className="text-xs font-bold uppercase tracking-wide text-[#71809a] dark:text-[var(--dark-muted)]">Primary deliverable</p>
+                <p className="mt-2 text-sm font-semibold text-[#111827] dark:text-[var(--dark-text)]">{responsibility.output}</p>
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 {responsibility.actions.map((action) => (
@@ -403,7 +940,7 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
               <h2 className="app-heading text-base font-semibold">Service Coverage</h2>
               <p className="app-muted mt-1 text-sm">Signals available for this responsibility.</p>
             </div>
-            <span className="rounded-full bg-[#efecff] px-2.5 py-1 text-xs font-semibold text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
+            <span className="rounded-full bg-[#efecff] px-2.5 py-1 text-xs font-semibold text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
               {coverageRows.filter((item) => item.status === 'Live').length}/{coverageRows.length} live
             </span>
           </div>
@@ -411,7 +948,7 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
             {coverageRows.map((service) => (
               <div key={service.name} className="app-surface-subtle flex items-center justify-between gap-3 rounded-lg p-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[#111827] dark:text-slate-100">{service.name}</p>
+                  <p className="truncate text-sm font-semibold text-[#111827] dark:text-[var(--dark-text)]">{service.name}</p>
                   <p className="app-muted mt-1 text-xs">{service.detail}</p>
                 </div>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${coverageStatusClass(service.status)}`}>
@@ -430,14 +967,14 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
               <AreaChart data={summaryTrend}>
                 <defs>
                   <linearGradient id={`analyticsActivity-${responsibility.key}`} x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="#6246ea" stopOpacity={0.26} />
-                    <stop offset="100%" stopColor="#6246ea" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--chart-primary-fill)" stopOpacity={0.26} />
+                    <stop offset="100%" stopColor="var(--chart-primary-fill)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="label" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} />
                 <Tooltip />
-                <Area type="monotone" dataKey="tasks" stroke="#6246ea" fill={`url(#analyticsActivity-${responsibility.key})`} strokeWidth={2} />
+                <Area type="monotone" dataKey="tasks" stroke="var(--chart-primary)" fill={`url(#analyticsActivity-${responsibility.key})`} strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -452,7 +989,7 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
                   <p className="app-muted mt-1 font-mono text-xs">{task.id}</p>
                 </div>
                 <div className="text-right">
-                  <p className={`text-sm font-semibold ${task.status === 'Failed' ? 'text-red-500' : task.status === 'Running' ? 'text-[#6246ea] dark:text-violet-300' : 'app-muted-strong'}`}>
+                  <p className={`text-sm font-semibold ${task.status === 'Failed' ? 'text-red-500' : task.status === 'Running' ? 'text-[#6246ea] dark:text-[var(--dark-primary-muted)]' : 'app-muted-strong'}`}>
                     {task.status}
                   </p>
                   <p className="app-muted mt-1 text-xs">{task.duration}</p>
@@ -469,7 +1006,7 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
             {readinessFor(responsibility.key).map((item) => (
               <div key={item.label} className="app-surface-subtle rounded-lg p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-[#4f5d73] dark:text-slate-300">{item.label}</p>
+                  <p className="text-sm font-semibold text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">{item.label}</p>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${coverageStatusClass(item.status)}`}>{item.status}</span>
                 </div>
                 <p className="app-muted mt-2 text-xs leading-5">{item.detail}</p>
@@ -481,11 +1018,11 @@ function AnalyticsResponsibilityView({ responsibility }: { responsibility: (type
         <Panel title="Next Actions">
           <div className="grid gap-3 md:grid-cols-3">
             {plan.map((step, index) => (
-              <div key={step.title} className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[#263247] dark:bg-[#0f172a]">
-                <span className="grid size-8 place-items-center rounded-full bg-[#efecff] text-sm font-bold text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
+              <div key={step.title} className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
+                <span className="grid size-8 place-items-center rounded-full bg-[#efecff] text-sm font-bold text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
                   {index + 1}
                 </span>
-                <p className="mt-3 text-sm font-semibold text-[#111827] dark:text-slate-100">{step.title}</p>
+                <p className="mt-3 text-sm font-semibold text-[#111827] dark:text-[var(--dark-text)]">{step.title}</p>
                 <p className="app-muted mt-2 text-xs leading-5">{step.detail}</p>
               </div>
             ))}
@@ -561,6 +1098,32 @@ interface FirebaseOverviewResponse {
   errors: string[];
 }
 
+type CommanderTone = 'healthy' | 'info' | 'warning' | 'critical' | 'unknown';
+
+interface CommanderQueryResponse {
+  prompt: string;
+  intent: string;
+  answer: string;
+  ai_provider: string;
+  ai_model: string | null;
+  generated_at: string;
+  data_sources: string[];
+  sections: Array<{
+    title: string;
+    summary: string;
+    metrics: Array<{ label: string; value: string; tone: CommanderTone }>;
+    evidence: string[];
+  }>;
+  findings: Array<{
+    severity: CommanderTone;
+    title: string;
+    detail: string;
+    evidence: string[];
+  }>;
+  recommended_actions: string[];
+  limitations: string[];
+}
+
 const serviceAnalyticsLabels: Record<ServiceAnalyticsKey, string> = {
   rc: 'RC Analytics',
   challan: 'Challan Analytics',
@@ -610,13 +1173,20 @@ const embeddedMetricMeta = {
   updated: { label: 'Last updated', icon: Clock3, tone: 'slate' },
 } as const;
 
-function FirebaseSignalsPanel() {
+function FirebaseSignalsPanel({ agentPaused }: { agentPaused: boolean }) {
   const [overview, setOverview] = useState<FirebaseOverviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+    if (agentPaused) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const client = new ApiClient({ baseUrl: window.location.origin });
 
     setLoading(true);
@@ -644,7 +1214,7 @@ function FirebaseSignalsPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [agentPaused]);
 
   const activeUsers = firebaseMetricValue(overview, 'activeUsers');
   const newUsers = firebaseMetricValue(overview, 'newUsers');
@@ -658,6 +1228,9 @@ function FirebaseSignalsPanel() {
   const viewsComparison = firebaseYesterdayComparison(overview, 'screenPageViews');
   const eventsComparison = firebaseYesterdayComparison(overview, 'eventCount');
   const engagementComparison = firebaseYesterdayComparison(overview, 'userEngagementDuration');
+  const activeUsersTrend = firebaseMetricTrend(overview, 'activeUsers');
+  const sessionsTrend = firebaseMetricTrend(overview, 'sessions');
+  const viewsTrend = firebaseMetricTrend(overview, 'screenPageViews');
   const reportsCount = overview?.crashlytics?.reports.length ?? 0;
   const missing = overview?.config.missing ?? [];
   const firebaseErrors = overview?.errors ?? [];
@@ -668,14 +1241,15 @@ function FirebaseSignalsPanel() {
   const hasPartialWarning = !needsSetup && warningMessages.length > 0;
   const needsDependencyInstall = setupMessages.some((message) => message.toLowerCase().includes('dependencies'));
   const primaryMetrics = [
-    { label: 'Active users', value: formatFirebaseNumber(activeUsers), icon: Activity, comparison: activeUsersComparison },
-    { label: 'Sessions', value: formatFirebaseNumber(sessions), icon: Gauge, comparison: sessionsComparison },
-    { label: 'Screen views', value: formatFirebaseNumber(views), icon: FileText, comparison: viewsComparison },
+    { label: 'Active users', value: formatFirebaseNumber(activeUsers), icon: Activity, comparison: activeUsersComparison, trend: activeUsersTrend },
+    { label: 'Sessions', value: formatFirebaseNumber(sessions), icon: Gauge, comparison: sessionsComparison, trend: sessionsTrend },
+    { label: 'Screen views', value: formatFirebaseNumber(views), icon: FileText, comparison: viewsComparison, trend: viewsTrend },
     {
       label: 'Crash reports',
       value: overview?.crashlytics ? String(reportsCount) : '--',
       icon: AlertTriangle,
       help: overview?.crashlytics ? undefined : 'Crashlytics API not connected',
+      trend: [],
     },
   ];
   const secondaryMetrics = [
@@ -699,7 +1273,7 @@ function FirebaseSignalsPanel() {
         <span
           className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${
             loading
-              ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+              ? 'bg-slate-100 text-slate-600 dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]'
               : needsSetup
                 ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
                 : hasPartialWarning
@@ -713,7 +1287,7 @@ function FirebaseSignalsPanel() {
       </div>
 
       {needsSetup ? (
-        <div className="mx-5 mb-5 grid gap-4 rounded-lg bg-slate-50/80 p-4 ring-1 ring-slate-200/80 dark:bg-slate-950/30 dark:ring-slate-700/60 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
+        <div className="mx-5 mb-5 grid gap-4 rounded-lg bg-slate-50/80 p-4 ring-1 ring-slate-200/80 dark:bg-[var(--dark-bg)] dark:ring-[var(--dark-border)] lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
           <div className="flex gap-3">
             <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-300">
               <AlertCircle className="size-5" />
@@ -722,7 +1296,7 @@ function FirebaseSignalsPanel() {
               <p className="app-heading font-semibold">Connect Firebase before metrics appear</p>
               <p className="app-muted mt-1 text-sm">{setupMessages[0]}</p>
               {needsDependencyInstall ? (
-                <code className="mt-3 block overflow-x-auto rounded-md bg-white px-3 py-2 font-mono text-xs font-semibold text-[#4f46e5] ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-violet-200 dark:ring-slate-700/70">
+                <code className="mt-3 block overflow-x-auto rounded-md bg-white px-3 py-2 font-mono text-xs font-semibold text-[#4f46e5] ring-1 ring-slate-200 dark:bg-[var(--dark-bg)] dark:text-[var(--dark-primary-muted)] dark:ring-[var(--dark-border)]">
                   python3 -m pip install -e agents/analytics-agent
                 </code>
               ) : null}
@@ -730,10 +1304,10 @@ function FirebaseSignalsPanel() {
           </div>
           <div className="grid gap-2 text-sm">
             {['Install Firebase dependencies', 'Configure Firebase env values', 'Restart analytics-agent'].map((item, index) => (
-              <div key={item} className="flex items-center gap-3 rounded-md bg-white/70 px-3 py-2 text-[#4f5d73] ring-1 ring-slate-200/70 dark:bg-slate-900/50 dark:text-slate-300 dark:ring-slate-700/50">
+              <div key={item} className="flex items-center gap-3 rounded-md bg-white/70 px-3 py-2 text-[#4f5d73] ring-1 ring-slate-200/70 dark:bg-[var(--dark-elevated)] dark:text-[var(--dark-muted-strong)] dark:ring-[var(--dark-border)]">
                 <span
                   className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${
-                    index === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    index === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300' : 'bg-slate-100 text-slate-500 dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted)]'
                   }`}
                 >
                   {index + 1}
@@ -745,7 +1319,7 @@ function FirebaseSignalsPanel() {
           {setupMessages.length > 1 ? (
             <div className="lg:col-span-2 flex flex-wrap gap-2">
               {setupMessages.slice(1).map((message) => (
-                <span key={message} className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold text-[#66758f] ring-1 ring-slate-200/70 dark:bg-slate-900/50 dark:text-slate-300 dark:ring-slate-700/50">
+                <span key={message} className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold text-[#66758f] ring-1 ring-slate-200/70 dark:bg-[var(--dark-elevated)] dark:text-[var(--dark-muted-strong)] dark:ring-[var(--dark-border)]">
                   {message}
                 </span>
               ))}
@@ -753,7 +1327,7 @@ function FirebaseSignalsPanel() {
           ) : null}
         </div>
       ) : (
-        <div className="border-t border-[#e6eaf2] p-5 dark:border-[#263247]">
+        <div className="border-t border-[#e6eaf2] p-5 dark:border-[var(--dark-border)]">
           <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
             {primaryMetrics.map((metric) => (
               <FirebaseMetricCard
@@ -763,6 +1337,7 @@ function FirebaseSignalsPanel() {
                 icon={metric.icon}
                 comparison={metric.comparison}
                 help={metric.help}
+                trend={metric.trend}
               />
             ))}
           </div>
@@ -826,12 +1401,14 @@ function FirebaseMetricCard({
   icon: Icon,
   comparison,
   help,
+  trend,
 }: {
   label: string;
   value: string;
   icon: typeof Activity;
   comparison?: FirebaseMetricComparison | null;
   help?: string;
+  trend?: FirebaseTrendPoint[];
 }) {
   const trendPercent = comparison ? formatFirebaseTrendPercent(comparison) : null;
 
@@ -848,8 +1425,9 @@ function FirebaseMetricCard({
           <Icon className="size-4" />
         </div>
       </div>
+      {trend?.length ? <FirebaseMiniTrend data={trend} /> : null}
       {comparison ? (
-        <div className="mt-4 grid grid-cols-3 gap-2 rounded-lg bg-white/60 p-2 ring-1 ring-[#e6eaf2]/70 dark:bg-slate-950/25 dark:ring-[#263247]/80">
+        <div className="mt-4 grid grid-cols-3 gap-2 rounded-lg bg-white/60 p-2 ring-1 ring-[#e6eaf2]/70 dark:bg-[var(--dark-bg)] dark:ring-[var(--dark-border)]">
           <FirebaseMetricDetail label="Yesterday" value={formatFirebaseNumber(comparison.yesterday)} />
           <FirebaseMetricDetail
             label="Change"
@@ -865,9 +1443,45 @@ function FirebaseMetricCard({
           />
         </div>
       ) : help ? (
-        <p className="app-muted mt-4 rounded-lg bg-white/60 px-3 py-2 text-xs ring-1 ring-[#e6eaf2]/70 dark:bg-slate-950/25 dark:ring-[#263247]/80">{help}</p>
+        <p className="app-muted mt-4 rounded-lg bg-white/60 px-3 py-2 text-xs ring-1 ring-[#e6eaf2]/70 dark:bg-[var(--dark-bg)] dark:ring-[var(--dark-border)]">{help}</p>
       ) : null}
     </article>
+  );
+}
+
+function FirebaseMiniTrend({ data }: { data: FirebaseTrendPoint[] }) {
+  return (
+    <div className="mt-4 h-14">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 3, right: 0, bottom: 0, left: 0 }}>
+          <XAxis dataKey="label" hide />
+          <Tooltip
+            cursor={{ stroke: '#8b5cf6', strokeOpacity: 0.24 }}
+            contentStyle={{
+              borderRadius: 8,
+              border: '1px solid rgba(139, 92, 246, 0.28)',
+              background: 'rgba(15, 23, 42, 0.96)',
+              color: '#f8fafc',
+              boxShadow: '0 12px 30px rgba(15, 23, 42, 0.22)',
+            }}
+            labelFormatter={(label) => String(label)}
+            formatter={(tooltipValue) => [formatFirebaseNumber(Number(tooltipValue)), 'Value']}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            name="Value"
+            stroke="#8b5cf6"
+            strokeWidth={2}
+            fill="#8b5cf6"
+            fillOpacity={0.14}
+            dot={false}
+            activeDot={{ r: 3, fill: '#c4b5fd', stroke: '#8b5cf6', strokeWidth: 2 }}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -889,7 +1503,7 @@ function FirebaseMetricDetail({
       ? 'text-emerald-700 dark:text-emerald-300'
       : tone === 'negative'
         ? 'text-rose-700 dark:text-rose-300'
-        : 'text-[#111827] dark:text-slate-100';
+        : 'text-[#111827] dark:text-[var(--dark-text)]';
 
   return (
     <div className="min-w-0">
@@ -913,7 +1527,7 @@ function FirebaseMiniStat({
   const trendPercent = comparison ? formatFirebaseTrendPercent(comparison) : null;
 
   return (
-    <div className="rounded-lg bg-white/70 p-3 ring-1 ring-[#e6eaf2] dark:bg-slate-950/30 dark:ring-[#263247]">
+    <div className="rounded-lg bg-white/70 p-3 ring-1 ring-[#e6eaf2] dark:bg-[var(--dark-bg)] dark:ring-[var(--dark-border)]">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="app-muted truncate text-xs font-semibold uppercase">{label}</p>
@@ -961,10 +1575,10 @@ function FirebaseBreakdownSummary({
         {breakdowns.slice(0, 4).map((breakdown) => {
           const primaryMetric = preferredFirebaseMetric(breakdown);
           return (
-            <div key={breakdown.name} className="rounded-lg bg-white/70 p-3 ring-1 ring-[#e6eaf2] dark:bg-slate-950/30 dark:ring-[#263247]">
+            <div key={breakdown.name} className="rounded-lg bg-white/70 p-3 ring-1 ring-[#e6eaf2] dark:bg-[var(--dark-bg)] dark:ring-[var(--dark-border)]">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[#111827] dark:text-slate-100">{breakdown.name}</p>
+                  <p className="truncate text-sm font-semibold text-[#111827] dark:text-[var(--dark-text)]">{breakdown.name}</p>
                   <p className="app-muted mt-0.5 truncate text-xs">{formatFirebaseMetricLabel(primaryMetric)}</p>
                 </div>
                 <span className="app-muted shrink-0 text-xs">
@@ -975,8 +1589,8 @@ function FirebaseBreakdownSummary({
                 {breakdown.rows.length ? (
                   breakdown.rows.slice(0, 3).map((row) => (
                     <div key={`${breakdown.name}-${row.dimension}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs">
-                      <span className="truncate font-medium text-[#4f5d73] dark:text-slate-300">{row.dimension || '(not set)'}</span>
-                      <span className="font-mono font-semibold text-[#111827] dark:text-slate-100">
+                      <span className="truncate font-medium text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">{row.dimension || '(not set)'}</span>
+                      <span className="font-mono font-semibold text-[#111827] dark:text-[var(--dark-text)]">
                         <FirebaseNumberText value={formatFirebaseNumber(row.metrics[primaryMetric] ?? null)} />
                       </span>
                     </div>
@@ -1013,20 +1627,20 @@ function FirebaseBreakdownTable({
       <div className="mt-3 space-y-2">
         {breakdown.rows.length ? (
           breakdown.rows.slice(0, 5).map((row) => (
-            <div key={`${breakdown.name}-${row.dimension}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md bg-white px-3 py-2 text-sm dark:bg-slate-950/40">
-              <span className="truncate font-medium text-[#111827] dark:text-slate-100">{row.dimension || '(not set)'}</span>
-              <span className="font-mono text-xs font-semibold text-[#4f5d73] dark:text-slate-300">
+            <div key={`${breakdown.name}-${row.dimension}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md bg-white px-3 py-2 text-sm dark:bg-[var(--dark-bg)]">
+              <span className="truncate font-medium text-[#111827] dark:text-[var(--dark-text)]">{row.dimension || '(not set)'}</span>
+              <span className="font-mono text-xs font-semibold text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">
                 <FirebaseNumberText value={formatFirebaseNumber(row.metrics[primaryMetric] ?? null)} />
               </span>
               {secondaryMetric ? (
-                <span className="font-mono text-xs text-[#71809a] dark:text-slate-400">
+                <span className="font-mono text-xs text-[#71809a] dark:text-[var(--dark-muted)]">
                   <FirebaseNumberText value={formatFirebaseNumber(row.metrics[secondaryMetric] ?? null)} />
                 </span>
               ) : null}
             </div>
           ))
         ) : (
-          <p className="app-muted rounded-md bg-white px-3 py-2 text-sm dark:bg-slate-950/40">No rows returned.</p>
+          <p className="app-muted rounded-md bg-white px-3 py-2 text-sm dark:bg-[var(--dark-bg)]">No rows returned.</p>
         )}
       </div>
       {primaryMetric ? (
@@ -1040,13 +1654,22 @@ function FirebaseBreakdownTable({
 }
 
 function firebaseMetricValue(overview: FirebaseOverviewResponse | null, name: string): number | null {
-  return overview?.analytics?.totals.find((metric) => metric.name === name)?.value ?? null;
+  const daily = overview?.analytics?.daily ?? [];
+  const latestDailyValue = daily[daily.length - 1]?.metrics[name];
+
+  return latestDailyValue ?? overview?.analytics?.totals.find((metric) => metric.name === name)?.value ?? null;
 }
 
 type FirebaseMetricComparison = {
   today: number;
   yesterday: number;
   delta: number;
+};
+
+type FirebaseTrendPoint = {
+  date: string;
+  label: string;
+  value: number;
 };
 
 function firebaseYesterdayComparison(overview: FirebaseOverviewResponse | null, metricName: string): FirebaseMetricComparison | null {
@@ -1066,6 +1689,20 @@ function firebaseYesterdayComparison(overview: FirebaseOverviewResponse | null, 
     yesterday,
     delta: today - yesterday,
   };
+}
+
+function firebaseMetricTrend(overview: FirebaseOverviewResponse | null, metricName: string): FirebaseTrendPoint[] {
+  return (overview?.analytics?.daily ?? [])
+    .slice(-7)
+    .map((row) => {
+      const value = row.metrics[metricName];
+
+      return {
+        date: row.date,
+        label: formatFirebaseTrendDate(row.date),
+        value: typeof value === 'number' && Number.isFinite(value) ? value : 0,
+      };
+    });
 }
 
 function preferredFirebaseMetric(breakdown: NonNullable<FirebaseOverviewResponse['analytics']>['breakdowns'][number]) {
@@ -1113,6 +1750,15 @@ function formatFirebaseNumber(value: number | null) {
     return '--';
   }
   return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatFirebaseTrendDate(date: string) {
+  const parsed = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return date;
+  }
+
+  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' }).format(parsed);
 }
 
 function FirebaseNumberText({
@@ -1179,7 +1825,7 @@ function FirebaseNumberText({
     <>
       <span
         ref={triggerRef}
-        className="cursor-help rounded-sm outline-none transition-colors duration-200 ease-out hover:text-violet-700 focus-visible:text-violet-700 focus-visible:ring-2 focus-visible:ring-violet-500/40 dark:hover:text-violet-200 dark:focus-visible:text-violet-200"
+        className="cursor-help rounded-sm outline-none transition-colors duration-200 ease-out hover:text-violet-700 focus-visible:text-violet-700 focus-visible:ring-2 focus-visible:ring-violet-500/40 dark:hover:text-[var(--dark-primary-muted)] dark:focus-visible:text-[var(--dark-primary-muted)]"
         tabIndex={0}
         aria-label={`${prefix}${value}: ${tooltip}`}
         onBlur={() => setTooltipPosition(null)}
@@ -1194,19 +1840,19 @@ function FirebaseNumberText({
         ? createPortal(
             <span
               role="tooltip"
-              className={`pointer-events-none fixed z-[9999] w-max max-w-[17rem] -translate-x-1/2 rounded-md border border-[#e6eaf2]/80 bg-white px-3 py-2 text-left shadow-lg shadow-slate-950/10 dark:border-[#263247]/80 dark:bg-[#0f172a] dark:shadow-black/30 ${
+              className={`pointer-events-none fixed z-[9999] w-max max-w-[17rem] -translate-x-1/2 rounded-md border border-[#e6eaf2]/80 bg-white px-3 py-2 text-left shadow-lg shadow-slate-950/10 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)] dark:shadow-black/30 ${
                 tooltipPosition.placement === 'top' ? '-translate-y-full' : ''
               }`}
               style={{ left: tooltipPosition.left, top: tooltipPosition.top }}
             >
-              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[#71809a] dark:text-slate-500">
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[#71809a] dark:text-[var(--dark-text)]">
                 In words
               </span>
-              <span className="mt-0.5 block text-xs font-semibold leading-5 text-[#111827] dark:text-slate-100">
+              <span className="mt-0.5 block text-xs font-semibold leading-5 text-[#111827] dark:text-[var(--dark-text)]">
                 {tooltip}
               </span>
               <span
-                className={`absolute left-1/2 size-2 -translate-x-1/2 rotate-45 border-[#e6eaf2]/80 bg-white dark:border-[#263247]/80 dark:bg-[#0f172a] ${
+                className={`absolute left-1/2 size-2 -translate-x-1/2 rotate-45 border-[#e6eaf2]/80 bg-white dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)] ${
                   tooltipPosition.placement === 'top'
                     ? '-bottom-1 border-b border-r'
                     : '-top-1 border-l border-t'
@@ -1335,7 +1981,7 @@ function firebaseWarningMessages(errors: string[]) {
   return [...messages];
 }
 
-function EmbeddedServiceAnalyticsDashboard() {
+function EmbeddedServiceAnalyticsDashboard({ agentPaused }: { agentPaused: boolean }) {
   const [serviceKey, setServiceKey] = useState<ServiceAnalyticsKey>('rc');
   const [health, setHealth] = useState<ServiceHealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1350,6 +1996,12 @@ function EmbeddedServiceAnalyticsDashboard() {
 
   const loadHealth = useCallback(
     async ({ showInitialLoader = false }: { showInitialLoader?: boolean } = {}) => {
+      if (agentPaused) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
       const client = new ApiClient({ baseUrl: runtimeConfig.apiBaseUrl });
@@ -1378,7 +2030,7 @@ function EmbeddedServiceAnalyticsDashboard() {
         }
       }
     },
-    [serviceKey],
+    [agentPaused, serviceKey],
   );
 
   useEffect(() => {
@@ -1386,7 +2038,8 @@ function EmbeddedServiceAnalyticsDashboard() {
   }, [loadHealth]);
 
   useEffect(() => {
-    if (!autoRefreshEnabled) {
+    if (!autoRefreshEnabled || agentPaused) {
+      setRefreshing(false);
       return;
     }
 
@@ -1395,7 +2048,7 @@ function EmbeddedServiceAnalyticsDashboard() {
     }, refreshIntervalMs);
 
     return () => window.clearInterval(intervalId);
-  }, [autoRefreshEnabled, loadHealth, refreshIntervalMs]);
+  }, [agentPaused, autoRefreshEnabled, loadHealth, refreshIntervalMs]);
 
   useEffect(() => {
     function updateActiveTabIndicator() {
@@ -1439,13 +2092,13 @@ function EmbeddedServiceAnalyticsDashboard() {
       <section className="app-surface overflow-hidden rounded-lg">
         <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex gap-4">
-            <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
+            <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
               <Server className="size-6" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-[#6246ea] dark:text-violet-300">Service Analytics</p>
-              <h2 className="mt-1 text-2xl font-semibold text-[#111827] dark:text-slate-50">{serviceAnalyticsLabels[serviceKey]}</h2>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#71809a] dark:text-slate-400">
+              <p className="text-sm font-semibold text-[#6246ea] dark:text-[var(--dark-primary-muted)]">Service Analytics</p>
+              <h2 className="mt-1 text-2xl font-semibold text-[#111827] dark:text-[var(--dark-text)]">{serviceAnalyticsLabels[serviceKey]}</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#71809a] dark:text-[var(--dark-muted)]">
                 {serviceAnalyticsDescriptions[serviceKey]}
               </p>
             </div>
@@ -1453,11 +2106,15 @@ function EmbeddedServiceAnalyticsDashboard() {
 
           <div className="flex flex-col items-start gap-6 lg:ml-auto lg:items-end">
             <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-              <span className="inline-flex h-8 items-center text-sm font-semibold text-[#71809a] dark:text-slate-400">
+              <span className="inline-flex h-8 items-center text-sm font-semibold text-[#71809a] dark:text-[var(--dark-muted)]">
                 {availableCount}/{totalSignals} signals
               </span>
-              {loading ? (
-                <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-[#e1e6ef] bg-[#f8faff] px-3 text-sm font-medium text-[#4f5d73] dark:border-[#263247] dark:bg-slate-800 dark:text-slate-300">
+              {agentPaused ? (
+                <span className="inline-flex h-8 items-center gap-2 rounded-lg bg-slate-100 px-3 text-sm font-semibold text-slate-600 dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]">
+                  Paused
+                </span>
+              ) : loading ? (
+                <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-[#e1e6ef] bg-[#f8faff] px-3 text-sm font-medium text-[#4f5d73] dark:border-[var(--dark-border)] dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]">
                   <Loader2 className="size-4 animate-spin" /> Loading
                 </span>
               ) : (
@@ -1465,35 +2122,41 @@ function EmbeddedServiceAnalyticsDashboard() {
               )}
             </div>
 
-            <div className="inline-flex h-8 max-w-full items-center gap-1 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-0.5 dark:border-[#263247] dark:bg-[#0f172a]">
-              <span className="grid size-7 shrink-0 place-items-center text-[#71809a] dark:text-slate-500" aria-label="Auto refresh">
-                {refreshing ? <Loader2 className="size-3.5 animate-spin text-[#6246ea] dark:text-violet-300" /> : <Clock3 className="size-3.5" />}
+            <div className="inline-flex h-8 max-w-full items-center gap-1 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-0.5 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
+              <span className="grid size-7 shrink-0 place-items-center text-[#71809a] dark:text-[var(--dark-text)]" aria-label="Auto refresh">
+                {refreshing ? <Loader2 className="size-3.5 animate-spin text-[#6246ea] dark:text-[var(--dark-primary-muted)]" /> : <Clock3 className="size-3.5" />}
               </span>
               <button
                 type="button"
                 onClick={() => {
+                  if (agentPaused) {
+                    return;
+                  }
                   const nextEnabled = !autoRefreshEnabled;
                   setAutoRefreshEnabled(nextEnabled);
                   if (nextEnabled) {
                     void loadHealth();
                   }
                 }}
+                disabled={agentPaused}
                 className={`inline-flex h-7 min-w-16 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-semibold smooth-transition ${
-                  autoRefreshEnabled
+                  agentPaused
+                    ? 'cursor-not-allowed bg-slate-100 text-slate-500 dark:bg-[var(--dark-hover)] dark:text-[var(--dark-text)]'
+                    : autoRefreshEnabled
                     ? 'bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15'
-                    : 'bg-[#6246ea] text-white hover:bg-[#5438d9] dark:bg-violet-600 dark:hover:bg-violet-500'
+                    : 'bg-[#6246ea] text-white hover:bg-[#5438d9] dark:bg-[var(--dark-primary)] dark:hover:bg-[var(--dark-primary-hover)]'
                 }`}
               >
-                {autoRefreshEnabled ? <Pause className="size-3" /> : <Play className="size-3" />}
-                {autoRefreshEnabled ? 'Stop' : 'Start'}
+                {agentPaused ? <Pause className="size-3" /> : autoRefreshEnabled ? <Pause className="size-3" /> : <Play className="size-3" />}
+                {agentPaused ? 'Paused' : autoRefreshEnabled ? 'Stop' : 'Start'}
               </button>
 
               <select
                 value={refreshIntervalMs}
                 onChange={(event) => setRefreshIntervalMs(Number(event.target.value) as (typeof refreshIntervals)[number]['value'])}
-                disabled={!autoRefreshEnabled}
+                disabled={!autoRefreshEnabled || agentPaused}
                 aria-label="Refresh interval"
-                className="h-7 min-w-20 rounded-md border border-transparent bg-white px-2 text-xs font-semibold text-[#4f5d73] outline-none smooth-transition disabled:cursor-not-allowed disabled:bg-transparent disabled:text-[#8b98ad] dark:bg-[#111827] dark:text-slate-300 dark:disabled:bg-transparent dark:disabled:text-slate-500"
+                className="h-7 min-w-20 rounded-md border border-transparent bg-white px-2 text-xs font-semibold text-[#4f5d73] outline-none smooth-transition disabled:cursor-not-allowed disabled:bg-transparent disabled:text-[#8b98ad] dark:bg-[var(--dark-surface)] dark:text-[var(--dark-muted-strong)] dark:disabled:bg-transparent dark:disabled:text-[var(--dark-muted)]"
               >
                 {refreshIntervals.map((option) => {
                   return (
@@ -1510,10 +2173,10 @@ function EmbeddedServiceAnalyticsDashboard() {
           </div>
         </div>
 
-        <nav ref={serviceTabListRef} className="relative flex flex-wrap gap-2 border-t border-[#e6eaf2] px-5 py-4 dark:border-[#263247]">
+        <nav ref={serviceTabListRef} className="relative flex flex-wrap gap-2 border-t border-[#e6eaf2] px-5 py-4 dark:border-[var(--dark-border)]">
           <span
             aria-hidden="true"
-            className={`absolute rounded-lg bg-[#efecff] transition-[left,top,width,height,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[left,top,width,height] dark:bg-violet-500/15 ${
+            className={`absolute rounded-lg bg-[#efecff] transition-[left,top,width,height,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[left,top,width,height] dark:bg-[var(--dark-primary-soft)] ${
               activeTabIndicator.ready ? 'opacity-100' : 'opacity-0'
             }`}
             style={{
@@ -1533,8 +2196,8 @@ function EmbeddedServiceAnalyticsDashboard() {
               onClick={() => setServiceKey(key as ServiceAnalyticsKey)}
               className={`relative z-10 rounded-lg px-3 py-2 text-sm font-medium smooth-transition ${
                 key === serviceKey
-                  ? 'text-[#4f3ee7] dark:text-violet-200'
-                  : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
+                  ? 'text-[#4f3ee7] dark:text-[var(--dark-primary-muted)]'
+                  : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-[var(--dark-muted-strong)] dark:hover:bg-[var(--dark-hover)] dark:hover:text-[var(--dark-primary-muted)]'
               }`}
             >
               {label}
@@ -1559,56 +2222,56 @@ function EmbeddedServiceAnalyticsDashboard() {
         <article className="app-surface card-smooth rounded-lg p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-base font-semibold text-[#111827] dark:text-slate-50">Signal coverage</h2>
-              <p className="mt-1 text-sm text-[#71809a] dark:text-slate-400">
+              <h2 className="text-base font-semibold text-[#111827] dark:text-[var(--dark-text)]">Signal coverage</h2>
+              <p className="mt-1 text-sm text-[#71809a] dark:text-[var(--dark-muted)]">
                 {missingCount ? `${missingCount} metrics still unavailable from Prometheus.` : 'All expected metrics are available.'}
               </p>
             </div>
-            <div className="grid size-10 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
+            <div className="grid size-10 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
               <Database className="size-5" />
             </div>
           </div>
           <div className="mt-4">
             {loading ? (
-              <div className="flex items-center gap-2 text-sm text-[#71809a] dark:text-slate-400">
+              <div className="flex items-center gap-2 text-sm text-[#71809a] dark:text-[var(--dark-muted)]">
                 <Loader2 className="size-4 animate-spin text-[#6246ea]" /> Loading coverage...
               </div>
             ) : health?.missing_metrics.length ? (
-              <ul className="space-y-2 text-sm text-[#4f5d73] dark:text-slate-300">
+              <ul className="space-y-2 text-sm text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">
                 {health.missing_metrics.map((metric) => (
-                  <li key={metric} className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 dark:border-[#263247] dark:bg-[#0f172a]">
-                    <span className="font-semibold text-[#111827] dark:text-slate-100">{metric}</span>
-                    <span className="ml-2 text-[#71809a] dark:text-slate-400">{embeddedUnavailable}</span>
+                  <li key={metric} className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
+                    <span className="font-semibold text-[#111827] dark:text-[var(--dark-text)]">{metric}</span>
+                    <span className="ml-2 text-[#71809a] dark:text-[var(--dark-muted)]">{embeddedUnavailable}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-[#4f5d73] dark:text-slate-400">{health ? 'No missing metrics reported.' : embeddedUnavailable}</p>
+              <p className="text-sm text-[#4f5d73] dark:text-[var(--dark-muted)]">{health ? 'No missing metrics reported.' : embeddedUnavailable}</p>
             )}
           </div>
         </article>
 
         <article className="app-surface card-smooth rounded-lg p-5">
           <div>
-            <h2 className="text-base font-semibold text-[#111827] dark:text-slate-50">Prometheus queries</h2>
-            <p className="mt-1 text-sm text-[#71809a] dark:text-slate-400">Raw PromQL used by the analytics agent for this service.</p>
+            <h2 className="text-base font-semibold text-[#111827] dark:text-[var(--dark-text)]">Prometheus queries</h2>
+            <p className="mt-1 text-sm text-[#71809a] dark:text-[var(--dark-muted)]">Raw PromQL used by the analytics agent for this service.</p>
           </div>
-          <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[#263247] dark:bg-[#0f172a]">
+          <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
             {loading ? (
-              <div className="flex items-center gap-2 text-sm text-[#71809a] dark:text-slate-400">
+              <div className="flex items-center gap-2 text-sm text-[#71809a] dark:text-[var(--dark-muted)]">
                 <Loader2 className="size-4 animate-spin text-[#6246ea]" /> Loading queries...
               </div>
             ) : health ? (
               <dl className="space-y-3 text-sm">
                 {Object.entries(health.raw_prometheus_queries).map(([name, query]) => (
-                  <div key={name} className="rounded-lg bg-white p-3 dark:bg-[#111827]">
-                    <dt className="font-semibold text-[#111827] dark:text-slate-100">{name}</dt>
-                    <dd className="mt-1 break-words font-mono text-xs text-[#4f5d73] dark:text-slate-400">{query}</dd>
+                  <div key={name} className="rounded-lg bg-white p-3 dark:bg-[var(--dark-surface)]">
+                    <dt className="font-semibold text-[#111827] dark:text-[var(--dark-text)]">{name}</dt>
+                    <dd className="mt-1 break-words font-mono text-xs text-[#4f5d73] dark:text-[var(--dark-muted)]">{query}</dd>
                   </div>
                 ))}
               </dl>
             ) : (
-              <p className="text-sm text-[#4f5d73] dark:text-slate-400">{embeddedUnavailable}</p>
+              <p className="text-sm text-[#4f5d73] dark:text-[var(--dark-muted)]">{embeddedUnavailable}</p>
             )}
           </div>
         </article>
@@ -1632,16 +2295,16 @@ function EmbeddedMetricCard({
 }) {
   const Icon = meta.icon;
   const toneClass = {
-    violet: 'bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200',
+    violet: 'bg-[#efecff] text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]',
     red: 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300',
     amber: 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300',
-    slate: 'bg-slate-100 text-[#71809a] dark:bg-slate-800 dark:text-slate-300',
+    slate: 'bg-slate-100 text-[#71809a] dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]',
   }[meta.tone];
 
   return (
     <article className="app-surface card-smooth min-h-36 rounded-lg p-5">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-semibold text-[#71809a] dark:text-slate-400">{meta.label}</p>
+        <p className="text-sm font-semibold text-[#71809a] dark:text-[var(--dark-muted)]">{meta.label}</p>
         <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${toneClass}`}>
           <Icon className="size-4" />
         </span>
@@ -1652,14 +2315,17 @@ function EmbeddedMetricCard({
           <div className="skeleton h-3 w-36" />
         </div>
       ) : value ? (
-        <p className="mt-4 text-2xl font-semibold text-[#111827] dark:text-slate-50">
-          {value}
-          {suffix ? <span className="ml-1 text-sm font-medium text-[#71809a] dark:text-slate-400">{suffix}</span> : null}
+        <p className="mt-4 text-2xl font-semibold text-[#111827] dark:text-[var(--dark-text)]">
+          <AnimatedMetricValue
+            value={value}
+            suffix={suffix}
+            suffixClassName="ml-1 text-sm font-medium text-[#71809a] dark:text-[var(--dark-muted)]"
+          />
         </p>
       ) : (
-        <p className="mt-4 text-sm leading-6 text-[#4f5d73] dark:text-slate-400">{embeddedUnavailable}</p>
+        <p className="mt-4 text-sm leading-6 text-[#4f5d73] dark:text-[var(--dark-muted)]">{embeddedUnavailable}</p>
       )}
-      <p className="mt-3 text-xs font-medium text-[#71809a] dark:text-slate-500">{helper}</p>
+      <p className="mt-3 text-xs font-medium text-[#71809a] dark:text-[var(--dark-text)]">{helper}</p>
     </article>
   );
 }
@@ -1710,7 +2376,7 @@ function EmbeddedStatusBadge({ status }: { status: ServiceHealthResponse['status
     healthy: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
     degraded: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
     critical: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
-    unknown: 'bg-[#f8faff] text-[#4f5d73] dark:bg-slate-800 dark:text-slate-300',
+    unknown: 'bg-[#f8faff] text-[#4f5d73] dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]',
   }[status];
 
   return <span className={`w-fit rounded px-3 py-1 text-sm font-medium capitalize ${className}`}>{label}</span>;
@@ -1793,7 +2459,7 @@ function executionPlanFor(key: string) {
 }
 
 function dashboardSignalsFor(key: string) {
-  const commonTone = 'bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200';
+  const commonTone = 'bg-[#efecff] text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]';
   const successTone = 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300';
   const warningTone = 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300';
 
@@ -2013,11 +2679,11 @@ function actionWorkbenchFor(key: string, action: string) {
 
 function ActionWorkbenchCard({ workbench, compact = false }: { workbench: ReturnType<typeof actionWorkbenchFor>; compact?: boolean }) {
   return (
-    <article className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[#263247] dark:bg-[#0f172a]">
+    <article className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-[#71809a] dark:text-slate-400">{compact ? 'Workspace' : 'Operational workspace'}</p>
-          <h3 className="mt-2 text-base font-semibold text-[#111827] dark:text-slate-100">{workbench.title}</h3>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#71809a] dark:text-[var(--dark-muted)]">{compact ? 'Workspace' : 'Operational workspace'}</p>
+          <h3 className="mt-2 text-base font-semibold text-[#111827] dark:text-[var(--dark-text)]">{workbench.title}</h3>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${coverageStatusClass(workbench.status)}`}>{workbench.status}</span>
       </div>
@@ -2026,9 +2692,9 @@ function ActionWorkbenchCard({ workbench, compact = false }: { workbench: Return
       {!compact ? (
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           {workbench.stats.map((stat) => (
-            <div key={stat.label} className="rounded-md border border-[#e6eaf2] bg-white p-3 dark:border-[#263247] dark:bg-[#111827]">
+            <div key={stat.label} className="rounded-md border border-[#e6eaf2] bg-white p-3 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface)]">
               <p className="app-muted text-[11px] font-bold uppercase tracking-wide">{stat.label}</p>
-              <p className="mt-1 text-sm font-semibold text-[#111827] dark:text-slate-100">{stat.value}</p>
+              <p className="mt-1 text-sm font-semibold text-[#111827] dark:text-[var(--dark-text)]">{stat.value}</p>
             </div>
           ))}
         </div>
@@ -2037,7 +2703,7 @@ function ActionWorkbenchCard({ workbench, compact = false }: { workbench: Return
       <div className="mt-4 space-y-2">
         {workbench.steps.slice(0, compact ? 2 : 3).map((step, index) => (
           <div key={step} className="flex gap-2 text-sm">
-            <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-[#efecff] text-[10px] font-bold text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
+            <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-[#efecff] text-[10px] font-bold text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
               {index + 1}
             </span>
             <p className="app-muted leading-5">{step}</p>
@@ -2046,7 +2712,7 @@ function ActionWorkbenchCard({ workbench, compact = false }: { workbench: Return
       </div>
 
       {workbench.href ? (
-        <Link href={workbench.href} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#6246ea] hover:text-[#4f3ee7] dark:text-violet-300 dark:hover:text-violet-200">
+        <Link href={workbench.href} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#6246ea] hover:text-[#4f3ee7] dark:text-[var(--dark-primary-muted)] dark:hover:text-[var(--dark-primary-muted)]">
           <BarChart3 className="size-4" /> {workbench.cta ?? 'Open details'}
         </Link>
       ) : null}
@@ -2056,8 +2722,8 @@ function ActionWorkbenchCard({ workbench, compact = false }: { workbench: Return
 
 function coverageStatusClass(status: string) {
   if (status === 'Live' || status === 'Ready') return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
-  if (status === 'Draft') return 'bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200';
-  return 'bg-slate-100 text-[#4f5d73] dark:bg-slate-800 dark:text-slate-300';
+  if (status === 'Draft') return 'bg-[#efecff] text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]';
+  return 'bg-slate-100 text-[#4f5d73] dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]';
 }
 
 function AgentStatusBadge({ status }: { status: AgentDisplayStatus }) {

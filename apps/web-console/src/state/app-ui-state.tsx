@@ -19,7 +19,7 @@ type AgentUiState = {
 const AppUiStateContext = createContext<AppUiState | null>(null);
 const AgentUiStateContext = createContext<AgentUiState | null>(null);
 
-const defaultAnalyticsTab = 'system';
+const defaultAnalyticsTab = 'dashboard';
 
 export function ShellUiStateProvider({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsedState] = usePersistentState('agentverse:sidebar-collapsed', false);
@@ -77,6 +77,8 @@ export function AgentUiStateProvider({ children }: { children: ReactNode }) {
     const tab = new URL(window.location.href).searchParams.get('tab');
     if (tab) {
       setSelectedAnalyticsTabState(tab);
+    } else if (window.location.pathname === '/agents/analytics') {
+      setSelectedAnalyticsTabState(defaultAnalyticsTab);
     }
   }, [setSelectedAnalyticsTabState]);
 

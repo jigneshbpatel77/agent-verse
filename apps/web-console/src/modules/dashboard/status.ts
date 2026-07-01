@@ -16,7 +16,7 @@ export function agentStatusPill(status: AgentDisplayStatus): string {
     Active: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
     Paused: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
     Degraded: 'bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300',
-    Idle: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    Idle: 'bg-slate-100 text-slate-600 dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]',
   }[status];
 }
 

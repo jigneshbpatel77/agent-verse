@@ -45,7 +45,7 @@ interface RunLogEntry {
 
 const client = new ApiClient({ baseUrl: typeof window === 'undefined' ? 'http://localhost:3000' : window.location.origin });
 
-export function MonitoringAgentControl({ embedded: _embedded = false }: { embedded?: boolean }) {
+export function MonitoringAgentControl({ embedded: _embedded = false, agentPaused = false }: { embedded?: boolean; agentPaused?: boolean }) {
   const [configuredLogGroups, setConfiguredLogGroups] = useState<string[]>([]);
   const [selectedLogGroups, setSelectedLogGroups] = useState<string[]>([]);
   const [newLogGroup, setNewLogGroup] = useState('');
@@ -61,6 +61,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
   const [removingLogGroup, setRemovingLogGroup] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
   const stopRequestedRef = useRef(false);
+  const resumeRunAfterPauseRef = useRef(false);
   const modeTabListRef = useRef<HTMLDivElement | null>(null);
   const modeTabRefs = useRef<Record<RunMode, HTMLButtonElement | null>>({ continuous: null, iterations: null });
   const [modeIndicator, setModeIndicator] = useState({ left: 0, top: 0, width: 0, height: 0, ready: false });
@@ -70,7 +71,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
   const latestFinding = findings[0];
   const highestSeverity = lastResult?.analysis?.highest_severity ?? 'none';
   const hasConfiguredLogGroups = configuredLogGroups.length > 0;
-  const runStatusText = runState === 'idle' ? 'Idle' : runState === 'running' ? 'Running' : 'Stopping';
+  const runStatusText = agentPaused ? 'Paused' : runState === 'idle' ? 'Idle' : runState === 'running' ? 'Running' : 'Stopping';
   const eventsAnalyzedLabel = lastResult ? `${lastResult.event_count} event${lastResult.event_count === 1 ? '' : 's'}` : 'Awaiting scan';
   const severityLabel = lastResult ? severityDisplay(highestSeverity) : 'Not checked';
   const findingsLabel = lastResult ? (findings.length ? `${findings.length} finding${findings.length === 1 ? '' : 's'}` : 'No findings') : 'Awaiting scan';
@@ -92,7 +93,14 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
 
   useEffect(() => {
     let cancelled = false;
+    if (agentPaused) {
+      setLogGroupsLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
 
+    setLogGroupsLoading(true);
     client
       .get<string[]>('/api/analytics-agent/api/v1/monitoring-alerting/cloudwatch/log-groups', { cache: 'no-store' })
       .then((groups) => {
@@ -117,7 +125,21 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
     return () => {
       cancelled = true;
     };
-  }, [addLog]);
+  }, [addLog, agentPaused]);
+
+  useEffect(() => {
+    if (!agentPaused) {
+      return;
+    }
+
+    stopRequestedRef.current = true;
+    setPolling(false);
+    if (runState === 'running') {
+      resumeRunAfterPauseRef.current = true;
+      setRunState('stopping');
+      addLog('warning', 'Agent paused. Monitoring run is stopping.');
+    }
+  }, [addLog, agentPaused, runState]);
 
   useEffect(() => {
     if (!hasConfiguredLogGroups) {
@@ -168,7 +190,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
     };
   }, [hasConfiguredLogGroups, runMode]);
 
-  const canStart = runState === 'idle' && selectedCount > 0 && !logGroupsLoading;
+  const canStart = runState === 'idle' && selectedCount > 0 && !logGroupsLoading && !agentPaused;
   const progressLabel = useMemo(() => {
     if (runMode === 'continuous') {
       return `${completedIterations} completed`;
@@ -177,6 +199,10 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
   }, [completedIterations, iterationTarget, runMode]);
 
   async function runOneIteration(iterationNumber: number) {
+    if (agentPaused || stopRequestedRef.current) {
+      return;
+    }
+
     addLog('info', `Iteration ${iterationNumber}: fetching last 2 minutes from ${selectedCount} log group${selectedCount === 1 ? '' : 's'}.`);
     setPolling(true);
     try {
@@ -223,7 +249,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
         }
 
         addLog('info', `Waiting ${pollIntervalSeconds}s before the next poll.`);
-        await sleep(pollIntervalSeconds * 1000);
+        await sleep(pollIntervalSeconds * 1000, () => stopRequestedRef.current);
       }
     } catch (error) {
       addLog('error', error instanceof Error ? error.message : 'Monitoring run failed.');
@@ -234,20 +260,34 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
     }
   }
 
+  useEffect(() => {
+    if (agentPaused || !resumeRunAfterPauseRef.current || !canStart) {
+      return;
+    }
+
+    resumeRunAfterPauseRef.current = false;
+    void startRun();
+  }, [agentPaused, canStart]);
+
   function stopRun() {
+    resumeRunAfterPauseRef.current = false;
     stopRequestedRef.current = true;
     setRunState('stopping');
     addLog('warning', 'Stop requested. Current poll will finish first.');
   }
 
   function toggleLogGroup(logGroup: string) {
+    if (agentPaused) {
+      return;
+    }
+
     setSelectedLogGroups((current) =>
       current.includes(logGroup) ? current.filter((item) => item !== logGroup) : [...current, logGroup],
     );
   }
 
   async function addLogGroup() {
-    if (addingLogGroup) {
+    if (addingLogGroup || agentPaused) {
       return;
     }
 
@@ -274,7 +314,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
   }
 
   async function removeLogGroup(logGroup: string) {
-    if (removingLogGroup) {
+    if (removingLogGroup || agentPaused) {
       return;
     }
 
@@ -304,15 +344,15 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
       <section className="app-surface card-smooth overflow-hidden rounded-lg">
         <div className="flex flex-col gap-5 p-5 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 gap-4">
-            <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
+            <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
               <AlertTriangle className="size-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[#6246ea] dark:text-violet-300">Monitoring & Alerting</p>
-              <h2 className="mt-1 text-2xl font-semibold text-[#111827] dark:text-slate-50">
+              <p className="text-sm font-semibold text-[#6246ea] dark:text-[var(--dark-primary-muted)]">Monitoring & Alerting</p>
+              <h2 className="mt-1 text-2xl font-semibold text-[#111827] dark:text-[var(--dark-text)]">
                 CloudWatch Signal Review
               </h2>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#71809a] dark:text-slate-400">
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#71809a] dark:text-[var(--dark-muted)]">
                 Watch configured log groups, run anomaly analysis, and review alert-ready findings.
               </p>
             </div>
@@ -324,10 +364,10 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
                 {polling ? <Spinner className="mr-2 size-4" /> : null}
                 {runStatusText}
               </span>
-              <span className="inline-flex h-9 items-center justify-center rounded-lg border border-[#e6eaf2] px-3 text-sm font-semibold text-[#4f5d73] dark:border-[#263247] dark:text-slate-300">
+              <span className="inline-flex h-9 items-center justify-center rounded-lg border border-[#e6eaf2] px-3 text-sm font-semibold text-[#4f5d73] dark:border-[var(--dark-border)] dark:text-[var(--dark-muted-strong)]">
                 {selectedCount}/{configuredLogGroups.length} groups
               </span>
-              <div className="inline-flex h-9 overflow-hidden rounded-lg border border-[#e6eaf2] bg-white dark:border-[#263247] dark:bg-[#0b1020]">
+              <div className="inline-flex h-9 overflow-hidden rounded-lg border border-[#e6eaf2] bg-white dark:border-[var(--dark-border)] dark:bg-[var(--dark-bg)]">
                 {runState === 'idle' ? (
                   <button
                     type="button"
@@ -351,7 +391,8 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
                 <button
                   type="button"
                   onClick={resetRunLog}
-                  className="inline-flex items-center justify-center border-l border-[#e6eaf2] px-3 text-sm font-semibold text-[#4f5d73] smooth-transition hover:bg-[#f8faff] dark:border-[#263247] dark:text-slate-300 dark:hover:bg-[#182338]"
+                  disabled={agentPaused}
+                  className="inline-flex items-center justify-center border-l border-[#e6eaf2] px-3 text-sm font-semibold text-[#4f5d73] smooth-transition hover:bg-[#f8faff] dark:border-[var(--dark-border)] dark:text-[var(--dark-muted-strong)] dark:hover:bg-[var(--dark-hover)]"
                   aria-label="Reset monitoring run"
                 >
                   <RotateCcw className="size-4" />
@@ -362,7 +403,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
             <span
               className={`inline-flex w-fit shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ${
                 logGroupsLoading
-                  ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                  ? 'bg-slate-100 text-slate-600 dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]'
                   : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
               }`}
             >
@@ -373,7 +414,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
         </div>
 
         {!logGroupsLoading && !hasConfiguredLogGroups ? (
-          <div className="mx-5 mb-5 grid gap-5 rounded-lg bg-slate-50/80 p-4 ring-1 ring-slate-200/80 dark:bg-slate-950/30 dark:ring-slate-700/60 xl:grid-cols-[minmax(0,0.95fr)_minmax(320px,0.75fr)]">
+          <div className="mx-5 mb-5 grid gap-5 rounded-lg bg-slate-50/80 p-4 ring-1 ring-slate-200/80 dark:bg-[var(--dark-bg)] dark:ring-[var(--dark-border)] xl:grid-cols-[minmax(0,0.95fr)_minmax(320px,0.75fr)]">
             <div className="flex gap-3">
               <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-300">
                 <AlertTriangle className="size-5" />
@@ -395,12 +436,13 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
                         void addLogGroup();
                       }
                     }}
+                    disabled={agentPaused}
                     placeholder="/aws/lambda/service-name"
-                    className="h-10 min-w-0 flex-1 rounded-lg border border-[#e6eaf2] bg-white px-3 font-mono text-xs text-[#111827] outline-none smooth-transition focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] dark:border-[#263247] dark:bg-[#0b1020] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-violet-400 dark:focus:ring-violet-500/20"
+                    className="h-10 min-w-0 flex-1 rounded-lg border border-[#e6eaf2] bg-white px-3 font-mono text-xs text-[#111827] outline-none smooth-transition disabled:cursor-not-allowed disabled:opacity-60 focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] dark:border-[var(--dark-border)] dark:bg-[var(--dark-bg)] dark:text-[var(--dark-text)] dark:placeholder:text-[var(--dark-muted)] dark:focus:border-[var(--dark-primary-border)] dark:focus:ring-[var(--dark-primary-border)]"
                   />
                   <button
                     type="button"
-                    disabled={addingLogGroup || !newLogGroup.trim()}
+                    disabled={addingLogGroup || !newLogGroup.trim() || agentPaused}
                     onClick={() => void addLogGroup()}
                     className="app-button-primary inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold disabled:cursor-not-allowed"
                   >
@@ -409,7 +451,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
                   </button>
                 </div>
 
-                <code className="mt-3 block overflow-x-auto rounded-md bg-white px-3 py-2 font-mono text-xs font-semibold text-[#4f46e5] ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-violet-200 dark:ring-slate-700/70">
+                <code className="mt-3 block overflow-x-auto rounded-md bg-white px-3 py-2 font-mono text-xs font-semibold text-[#4f46e5] ring-1 ring-slate-200 dark:bg-[var(--dark-bg)] dark:text-[var(--dark-primary-muted)] dark:ring-[var(--dark-border)]">
                   CLOUDWATCH_LOG_GROUPS=/aws/lambda/service-name
                 </code>
               </div>
@@ -422,10 +464,10 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
                 'Add CLOUDWATCH_LOG_GROUPS in agents/analytics-agent/.env',
                 'Restart analytics-agent and run a scan',
               ].map((item, index) => (
-                <div key={item} className="flex items-center gap-3 rounded-md bg-white/70 px-3 py-2 text-[#4f5d73] ring-1 ring-slate-200/70 dark:bg-slate-900/50 dark:text-slate-300 dark:ring-slate-700/50">
+                <div key={item} className="flex items-center gap-3 rounded-md bg-white/70 px-3 py-2 text-[#4f5d73] ring-1 ring-slate-200/70 dark:bg-[var(--dark-elevated)] dark:text-[var(--dark-muted-strong)] dark:ring-[var(--dark-border)]">
                   <span
                     className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${
-                      index === 2 ? 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                      index === 2 ? 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300' : 'bg-slate-100 text-slate-500 dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted)]'
                     }`}
                   >
                     {index + 1}
@@ -443,7 +485,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <HeaderStat title="Progress" value={progressLabel} />
             <HeaderStat title="Events analyzed" value={eventsAnalyzedLabel} />
-            <HeaderStat title="Highest severity" value={severityLabel} tone={lastResult ? severityTone(highestSeverity) : 'text-[#71809a] dark:text-slate-400'} />
+            <HeaderStat title="Highest severity" value={severityLabel} tone={lastResult ? severityTone(highestSeverity) : 'text-[#71809a] dark:text-[var(--dark-muted)]'} />
             <HeaderStat title="Findings" value={findingsLabel} />
           </section>
 
@@ -463,10 +505,10 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             <div>
               <label className="app-muted-strong text-sm font-semibold">Mode</label>
-              <div ref={modeTabListRef} className="relative mt-2 grid grid-cols-2 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-1 dark:border-[#263247] dark:bg-[#0b1020]">
+              <div ref={modeTabListRef} className="relative mt-2 grid grid-cols-2 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-1 dark:border-[var(--dark-border)] dark:bg-[var(--dark-bg)]">
                 <span
                   aria-hidden="true"
-                  className={`absolute rounded-md bg-[#efecff] transition-[left,top,width,height,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[left,top,width,height] dark:bg-violet-500/20 ${
+                  className={`absolute rounded-md bg-[#efecff] transition-[left,top,width,height,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[left,top,width,height] dark:bg-[var(--dark-primary-soft)] ${
                     modeIndicator.ready ? 'opacity-100' : 'opacity-0'
                   }`}
                   style={{
@@ -483,11 +525,16 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
                       modeTabRefs.current[mode] = node;
                     }}
                     type="button"
-                    onClick={() => setRunMode(mode)}
+                    onClick={() => {
+                      if (!agentPaused) {
+                        setRunMode(mode);
+                      }
+                    }}
+                    disabled={agentPaused}
                     className={`relative z-10 h-9 rounded-md px-3 text-sm font-semibold capitalize smooth-transition ${
                       runMode === mode
-                        ? 'text-[#4f3ee7] dark:text-violet-200'
-                        : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
+                        ? 'text-[#4f3ee7] dark:text-[var(--dark-primary-muted)]'
+                        : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-[var(--dark-muted-strong)] dark:hover:bg-[var(--dark-hover)] dark:hover:text-[var(--dark-primary-muted)]'
                     }`}
                   >
                     {mode}
@@ -497,13 +544,13 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <NumberField label="Interval seconds" value={pollIntervalSeconds} min={5} max={600} onChange={setPollIntervalSeconds} />
+              <NumberField label="Interval seconds" value={pollIntervalSeconds} min={5} max={600} disabled={agentPaused} onChange={setPollIntervalSeconds} />
               <NumberField
                 label="Iterations"
                 value={iterationTarget}
                 min={1}
                 max={200}
-                disabled={runMode !== 'iterations'}
+                disabled={runMode !== 'iterations' || agentPaused}
                 onChange={setIterationTarget}
               />
             </div>
@@ -522,12 +569,13 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
                     void addLogGroup();
                   }
                 }}
+                disabled={agentPaused}
                 placeholder="/aws/lambda/service-name"
-                  className="h-10 min-w-0 flex-1 rounded-lg border border-[#e6eaf2] bg-white px-3 font-mono text-xs text-[#111827] outline-none smooth-transition focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] dark:border-[#263247] dark:bg-[#0b1020] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-violet-400 dark:focus:ring-violet-500/20"
+                  className="h-10 min-w-0 flex-1 rounded-lg border border-[#e6eaf2] bg-white px-3 font-mono text-xs text-[#111827] outline-none smooth-transition disabled:cursor-not-allowed disabled:opacity-60 focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] dark:border-[var(--dark-border)] dark:bg-[var(--dark-bg)] dark:text-[var(--dark-text)] dark:placeholder:text-[var(--dark-muted)] dark:focus:border-[var(--dark-primary-border)] dark:focus:ring-[var(--dark-primary-border)]"
               />
               <button
                 type="button"
-                disabled={addingLogGroup || !newLogGroup.trim()}
+                disabled={addingLogGroup || !newLogGroup.trim() || agentPaused}
                 onClick={() => void addLogGroup()}
                 className="app-button-primary inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold disabled:cursor-not-allowed"
               >
@@ -538,7 +586,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
 
             <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
               {logGroupsLoading ? (
-                <div className="app-surface-subtle flex items-center gap-2 rounded-lg p-3 text-sm text-[#4f5d73] dark:text-slate-300">
+                <div className="app-surface-subtle flex items-center gap-2 rounded-lg p-3 text-sm text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">
                   <Spinner className="size-4 text-[#6246ea]" />
                   Loading CloudWatch groups...
                 </div>
@@ -550,20 +598,21 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
                       key={logGroup}
                       className={`flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-sm smooth-transition ${
                         selected
-                          ? 'border-[#d8d1ff] bg-[#f4f1ff] dark:border-violet-500/30 dark:bg-violet-500/10'
-                          : 'border-[#e6eaf2] bg-white hover:bg-[#fbfcff] dark:border-[#263247] dark:bg-[#0f172a] dark:hover:bg-[#182338]'
+                          ? 'border-[#d8d1ff] bg-[#f4f1ff] dark:border-[var(--dark-primary-border)] dark:bg-[var(--dark-primary-soft)]'
+                          : 'border-[#e6eaf2] bg-white hover:bg-[#fbfcff] dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)] dark:hover:bg-[var(--dark-hover)]'
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={selected}
+                        disabled={agentPaused}
                         onChange={() => toggleLogGroup(logGroup)}
                         className="size-4 rounded border-[#d8d1ff] accent-[#6246ea]"
                       />
-                      <span className="min-w-0 flex-1 break-all font-mono text-xs text-[#4f5d73] dark:text-slate-200">{logGroup}</span>
+                      <span className="min-w-0 flex-1 break-all font-mono text-xs text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">{logGroup}</span>
                       <button
                         type="button"
-                        disabled={removingLogGroup === logGroup}
+                        disabled={removingLogGroup === logGroup || agentPaused}
                         onClick={(event) => {
                           event.preventDefault();
                           void removeLogGroup(logGroup);
@@ -599,7 +648,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
 
           {latestFinding ? (
             <div className="mt-5 grid gap-4">
-              <div className="card-smooth rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[#263247] dark:bg-[#0f172a]">
+              <div className="card-smooth rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className={`mt-0.5 size-5 ${severityTone(latestFinding.severity)}`} />
                   <div className="min-w-0">
@@ -623,7 +672,7 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
                 <h3 className="app-muted-strong text-sm font-semibold">Evidence</h3>
                 {latestFinding.evidence.length ? (
                   latestFinding.evidence.map((item) => (
-                    <p key={item} className="card-smooth rounded-lg border border-[#e6eaf2] bg-white p-3 font-mono text-xs text-[#4f5d73] dark:border-[#263247] dark:bg-[#0b1020] dark:text-slate-200">
+                    <p key={item} className="card-smooth rounded-lg border border-[#e6eaf2] bg-white p-3 font-mono text-xs text-[#4f5d73] dark:border-[var(--dark-border)] dark:bg-[var(--dark-bg)] dark:text-[var(--dark-muted-strong)]">
                       {item}
                     </p>
                   ))
@@ -633,12 +682,12 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
               </div>
             </div>
           ) : (
-            <div className="mt-5 grid min-h-56 place-items-center rounded-lg border border-dashed border-[#d8d1ff] bg-[#fbfcff] p-6 text-center dark:border-[#263247] dark:bg-[#0f172a]">
+            <div className="mt-5 grid min-h-56 place-items-center rounded-lg border border-dashed border-[#d8d1ff] bg-[#fbfcff] p-6 text-center dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
               <div>
                 {polling ? (
                   <Spinner className="mx-auto size-8 text-[#6246ea]" />
                 ) : (
-                  <ServerCog className="mx-auto size-8 text-[#6246ea] dark:text-violet-300" />
+                  <ServerCog className="mx-auto size-8 text-[#6246ea] dark:text-[var(--dark-primary-muted)]" />
                 )}
                 <p className="app-muted mt-2 text-sm">{polling ? 'Analyzing latest CloudWatch events...' : emptyStateText}</p>
               </div>
@@ -658,14 +707,14 @@ export function MonitoringAgentControl({ embedded: _embedded = false }: { embedd
             <div className="mt-4 grid gap-2 lg:grid-cols-2">
               {runLog.length ? (
                 runLog.slice(0, 8).map((entry) => (
-                  <div key={entry.id} className="card-smooth grid gap-2 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 text-sm dark:border-[#263247] dark:bg-[#0f172a] md:grid-cols-[76px_74px_1fr]">
-                    <span className="font-mono text-xs text-[#71809a] dark:text-slate-500">{entry.time}</span>
+                  <div key={entry.id} className="card-smooth grid gap-2 rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 text-sm dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)] md:grid-cols-[76px_74px_1fr]">
+                    <span className="font-mono text-xs text-[#71809a] dark:text-[var(--dark-text)]">{entry.time}</span>
                     <span className={`text-xs font-semibold uppercase ${logTone(entry.level)}`}>{entry.level}</span>
-                    <span className="min-w-0 text-[#4f5d73] dark:text-slate-200">{entry.message}</span>
+                    <span className="min-w-0 text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">{entry.message}</span>
                   </div>
                 ))
               ) : (
-                <div className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-3 text-sm text-[#71809a] dark:border-[#263247] dark:bg-[#0f172a] dark:text-slate-400">
+                <div className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-3 text-sm text-[#71809a] dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)] dark:text-[var(--dark-muted)]">
                   No run activity yet.
                 </div>
               )}
@@ -702,15 +751,15 @@ function NumberField({
         disabled={disabled}
         value={value}
         onChange={(event) => onChange(clamp(Number(event.target.value), min, max))}
-        className="mt-2 h-10 w-full rounded-lg border border-[#e6eaf2] bg-white px-3 text-sm text-[#111827] outline-none smooth-transition focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] disabled:bg-slate-100 dark:border-[#263247] dark:bg-[#0b1020] dark:text-slate-100 dark:focus:border-violet-400 dark:focus:ring-violet-500/20 dark:disabled:bg-[#182338] dark:disabled:text-slate-500"
+        className="mt-2 h-10 w-full rounded-lg border border-[#e6eaf2] bg-white px-3 text-sm text-[#111827] outline-none smooth-transition focus:border-[#6246ea] focus:ring-2 focus:ring-[#efecff] disabled:bg-slate-100 dark:border-[var(--dark-border)] dark:bg-[var(--dark-bg)] dark:text-[var(--dark-text)] dark:focus:border-[var(--dark-primary-border)] dark:focus:ring-[var(--dark-primary-border)] dark:disabled:bg-[var(--dark-hover)] dark:disabled:text-[var(--dark-muted)]"
       />
     </label>
   );
 }
 
-function HeaderStat({ title, value, tone = 'text-[#111827] dark:text-slate-100' }: { title: string; value: string; tone?: string }) {
+function HeaderStat({ title, value, tone = 'text-[#111827] dark:text-[var(--dark-text)]' }: { title: string; value: string; tone?: string }) {
   return (
-    <div className="card-smooth rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[#263247] dark:bg-[#0f172a]">
+    <div className="card-smooth rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
       <p className="app-muted text-xs font-semibold uppercase">{title}</p>
       <p className={`mt-2 truncate text-xl font-semibold capitalize ${tone}`}>{value}</p>
     </div>
@@ -737,7 +786,7 @@ function runStateBadge(runState: RunState) {
   if (runState === 'stopping') {
     return 'border border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300';
   }
-  return 'border border-[#e6eaf2] bg-[#fbfcff] text-[#4f5d73] dark:border-[#263247] dark:bg-[#0f172a] dark:text-slate-300';
+  return 'border border-[#e6eaf2] bg-[#fbfcff] text-[#4f5d73] dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)] dark:text-[var(--dark-muted-strong)]';
 }
 
 function formatAnalyzedAt(value: string) {
@@ -748,9 +797,17 @@ function formatAnalyzedAt(value: string) {
   return date.toLocaleString();
 }
 
-function sleep(ms: number) {
+function sleep(ms: number, shouldStop?: () => boolean) {
   return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
+    const startedAt = Date.now();
+    const tick = () => {
+      if (shouldStop?.() || Date.now() - startedAt >= ms) {
+        resolve(undefined);
+        return;
+      }
+      window.setTimeout(tick, Math.min(250, ms));
+    };
+    window.setTimeout(tick, Math.min(250, ms));
   });
 }
 
@@ -776,7 +833,7 @@ function severityTone(severity: string) {
 
 function severityBadge(severity: string) {
   if (severity === 'unknown') {
-    return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
+    return 'bg-slate-100 text-slate-600 dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]';
   }
   if (severity === 'critical' || severity === 'high') {
     return 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300';
@@ -785,7 +842,7 @@ function severityBadge(severity: string) {
     return 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300';
   }
   if (severity === 'low') {
-    return 'bg-[#efecff] text-[#4f3ee7] dark:bg-violet-500/15 dark:text-violet-200';
+    return 'bg-[#efecff] text-[#4f3ee7] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]';
   }
   return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
 }

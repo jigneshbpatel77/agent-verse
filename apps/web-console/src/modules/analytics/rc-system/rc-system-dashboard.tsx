@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Activity, AlertTriangle, ChevronRight, Clock3, Cpu, Database, Gauge, HardDrive, Home, RotateCcw, Server, TimerReset, Wifi } from 'lucide-react';
 import { ApiClient } from '@/api/client';
+import { AnimatedMetricValue } from '@/components/animated-metric-value';
 import { runtimeConfig } from '@/config/runtime';
 
 interface RcHealthResponse {
@@ -79,32 +80,32 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
   return (
     <div className="space-y-6">
       <nav
-        className="flex max-w-full items-center gap-1.5 overflow-x-auto text-xs font-semibold text-[#71809a] dark:text-slate-400"
+        className="flex max-w-full items-center gap-1.5 overflow-x-auto text-xs font-semibold text-[#71809a] dark:text-[var(--dark-muted)]"
         aria-label="Breadcrumb"
       >
-        <Link href="/" className="grid size-6 shrink-0 place-items-center rounded-md text-[#71809a] transition hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:hover:bg-violet-500/10 dark:hover:text-violet-200">
+        <Link href="/" className="grid size-6 shrink-0 place-items-center rounded-md text-[#71809a] transition hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:hover:bg-[var(--dark-hover)] dark:hover:text-[var(--dark-primary-muted)]">
           <Home className="size-3.5" />
         </Link>
         <ChevronRight className="size-3.5 shrink-0 text-[#a4afc1]" />
-        <Link href="/agents/analytics" className="shrink-0 rounded-md px-1.5 py-1 transition hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:hover:bg-violet-500/10 dark:hover:text-violet-200">
+        <Link href="/agents/analytics" className="shrink-0 rounded-md px-1.5 py-1 transition hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:hover:bg-[var(--dark-hover)] dark:hover:text-[var(--dark-primary-muted)]">
           Analytics Agent
         </Link>
         <ChevronRight className="size-3.5 shrink-0 text-[#a4afc1]" />
-        <span className="shrink-0 px-1.5 py-1 text-[#4f5d73] dark:text-slate-300">System Analytics</span>
+        <span className="shrink-0 px-1.5 py-1 text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">System Analytics</span>
         <ChevronRight className="size-3.5 shrink-0 text-[#a4afc1]" />
-        <span className="truncate px-1.5 py-1 text-[#111827] dark:text-slate-100">{displayName}</span>
+        <span className="truncate px-1.5 py-1 text-[#111827] dark:text-[var(--dark-text)]">{displayName}</span>
       </nav>
 
       <section className="app-surface card-smooth overflow-hidden rounded-lg">
         <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex gap-4">
-            <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
+            <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
               <Server className="size-6" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-[#6246ea] dark:text-violet-300">Service Analytics</p>
-              <h1 className="mt-1 text-2xl font-semibold text-[#111827] dark:text-slate-50">{displayName}</h1>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#71809a] dark:text-slate-400">
+              <p className="text-sm font-semibold text-[#6246ea] dark:text-[var(--dark-primary-muted)]">Service Analytics</p>
+              <h1 className="mt-1 text-2xl font-semibold text-[#111827] dark:text-[var(--dark-text)]">{displayName}</h1>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-[#71809a] dark:text-[var(--dark-muted)]">
                 {serviceDescriptions[serviceKey] ?? 'Prometheus-backed health and latency analytics for VehicleInfo services.'}
               </p>
             </div>
@@ -112,21 +113,21 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
 
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={health?.status ?? 'unknown'} />
-            <span className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 text-sm font-medium text-[#4f5d73] dark:border-[#263247] dark:bg-slate-950/40 dark:text-slate-300">
+            <span className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 text-sm font-medium text-[#4f5d73] dark:border-[var(--dark-border)] dark:bg-[var(--dark-bg)] dark:text-[var(--dark-muted-strong)]">
               {availableCount}/11 signals
             </span>
           </div>
         </div>
 
-        <nav className="flex flex-wrap gap-2 border-t border-[#e6eaf2] px-5 py-4 dark:border-[#263247]">
+        <nav className="flex flex-wrap gap-2 border-t border-[#e6eaf2] px-5 py-4 dark:border-[var(--dark-border)]">
           {Object.entries(serviceLabels).map(([key, label]) => (
             <Link
               key={key}
               href={`/analytics/system/${key}`}
               className={`rounded-lg px-3 py-2 text-sm font-medium smooth-transition ${
                 key === serviceKey
-                  ? 'bg-[#efecff] text-[#4f3ee7] dark:bg-violet-500/15 dark:text-violet-200'
-                  : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:text-violet-200'
+                  ? 'bg-[#efecff] text-[#4f3ee7] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]'
+                  : 'text-[#4f5d73] hover:bg-[#f4f1ff] hover:text-[#4f3ee7] dark:text-[var(--dark-muted-strong)] dark:hover:bg-[var(--dark-hover)] dark:hover:text-[var(--dark-primary-muted)]'
               }`}
             >
               {label}
@@ -160,25 +161,25 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
         <article className="app-surface card-smooth rounded-lg p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-base font-semibold text-[#111827] dark:text-slate-50">Signal coverage</h2>
-              <p className="mt-1 text-sm text-[#71809a] dark:text-slate-400">{missingCount ? `${missingCount} metrics still unavailable from Prometheus.` : 'All expected metrics are available.'}</p>
+              <h2 className="text-base font-semibold text-[#111827] dark:text-[var(--dark-text)]">Signal coverage</h2>
+              <p className="mt-1 text-sm text-[#71809a] dark:text-[var(--dark-muted)]">{missingCount ? `${missingCount} metrics still unavailable from Prometheus.` : 'All expected metrics are available.'}</p>
             </div>
-            <div className="grid size-10 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200">
+            <div className="grid size-10 place-items-center rounded-lg bg-[#efecff] text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]">
               <Database className="size-5" />
             </div>
           </div>
           <div className="mt-4">
             {health?.missing_metrics.length ? (
-              <ul className="space-y-2 text-sm text-[#4f5d73] dark:text-slate-300">
+              <ul className="space-y-2 text-sm text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">
                 {health.missing_metrics.map((metric) => (
-                  <li key={metric} className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 dark:border-[#263247] dark:bg-[#0f172a]">
-                    <span className="font-semibold text-[#111827] dark:text-slate-100">{metric}</span>
-                    <span className="ml-2 text-[#71809a] dark:text-slate-400">{unavailable}</span>
+                  <li key={metric} className="rounded-lg border border-[#e6eaf2] bg-[#fbfcff] px-3 py-2 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
+                    <span className="font-semibold text-[#111827] dark:text-[var(--dark-text)]">{metric}</span>
+                    <span className="ml-2 text-[#71809a] dark:text-[var(--dark-muted)]">{unavailable}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-[#4f5d73] dark:text-slate-400">{health ? 'No missing metrics reported.' : unavailable}</p>
+              <p className="text-sm text-[#4f5d73] dark:text-[var(--dark-muted)]">{health ? 'No missing metrics reported.' : unavailable}</p>
             )}
           </div>
         </article>
@@ -186,22 +187,22 @@ export async function RcSystemDashboard({ serviceKey = 'rc' }: { serviceKey?: st
         <article className="app-surface card-smooth rounded-lg p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-base font-semibold text-[#111827] dark:text-slate-50">Prometheus queries</h2>
-              <p className="mt-1 text-sm text-[#71809a] dark:text-slate-400">Raw PromQL used by the analytics agent for this service.</p>
+              <h2 className="text-base font-semibold text-[#111827] dark:text-[var(--dark-text)]">Prometheus queries</h2>
+              <p className="mt-1 text-sm text-[#71809a] dark:text-[var(--dark-muted)]">Raw PromQL used by the analytics agent for this service.</p>
             </div>
           </div>
-          <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[#263247] dark:bg-[#0f172a]">
+          <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-[#e6eaf2] bg-[#fbfcff] p-4 dark:border-[var(--dark-border)] dark:bg-[var(--dark-surface-subtle)]">
             {health ? (
               <dl className="space-y-3 text-sm">
                 {Object.entries(health.raw_prometheus_queries).map(([name, query]) => (
-                  <div key={name} className="rounded-lg bg-white p-3 dark:bg-[#111827]">
-                    <dt className="font-semibold text-[#111827] dark:text-slate-100">{name}</dt>
-                    <dd className="mt-1 break-words font-mono text-xs text-[#4f5d73] dark:text-slate-400">{query}</dd>
+                  <div key={name} className="rounded-lg bg-white p-3 dark:bg-[var(--dark-surface)]">
+                    <dt className="font-semibold text-[#111827] dark:text-[var(--dark-text)]">{name}</dt>
+                    <dd className="mt-1 break-words font-mono text-xs text-[#4f5d73] dark:text-[var(--dark-muted)]">{query}</dd>
                   </div>
                 ))}
               </dl>
             ) : (
-              <p className="text-sm text-[#4f5d73] dark:text-slate-400">{unavailable}</p>
+              <p className="text-sm text-[#4f5d73] dark:text-[var(--dark-muted)]">{unavailable}</p>
             )}
           </div>
         </article>
@@ -236,29 +237,32 @@ function MetricCard({
 }) {
   const Icon = meta.icon;
   const toneClass = {
-    violet: 'bg-[#efecff] text-[#6246ea] dark:bg-violet-500/15 dark:text-violet-200',
+    violet: 'bg-[#efecff] text-[#6246ea] dark:bg-[var(--dark-primary-soft)] dark:text-[var(--dark-primary-muted)]',
     red: 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300',
     amber: 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300',
-    slate: 'bg-slate-100 text-[#71809a] dark:bg-slate-800 dark:text-slate-300',
+    slate: 'bg-slate-100 text-[#71809a] dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]',
   }[meta.tone];
 
   return (
     <article className="app-surface card-smooth min-h-36 rounded-lg p-5">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-semibold text-[#71809a] dark:text-slate-400">{meta.label}</p>
+        <p className="text-sm font-semibold text-[#71809a] dark:text-[var(--dark-muted)]">{meta.label}</p>
         <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${toneClass}`}>
           <Icon className="size-4" />
         </span>
       </div>
       {value ? (
-        <p className="mt-4 text-2xl font-semibold text-[#111827] dark:text-slate-50">
-          {value}
-          {suffix ? <span className="ml-1 text-sm font-medium text-[#71809a] dark:text-slate-400">{suffix}</span> : null}
+        <p className="mt-4 text-2xl font-semibold text-[#111827] dark:text-[var(--dark-text)]">
+          <AnimatedMetricValue
+            value={value}
+            suffix={suffix}
+            suffixClassName="ml-1 text-sm font-medium text-[#71809a] dark:text-[var(--dark-muted)]"
+          />
         </p>
       ) : (
-        <p className="mt-4 text-sm leading-6 text-[#4f5d73] dark:text-slate-400">{unavailable}</p>
+        <p className="mt-4 text-sm leading-6 text-[#4f5d73] dark:text-[var(--dark-muted)]">{unavailable}</p>
       )}
-      <p className="mt-3 text-xs font-medium text-[#71809a] dark:text-slate-500">{helper}</p>
+      <p className="mt-3 text-xs font-medium text-[#71809a] dark:text-[var(--dark-text)]">{helper}</p>
     </article>
   );
 }
@@ -268,7 +272,7 @@ function StatusBadge({ status }: { status: RcHealthResponse['status'] }) {
     healthy: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
     degraded: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
     critical: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
-    unknown: 'bg-[#f8faff] text-[#4f5d73] dark:bg-slate-800 dark:text-slate-300',
+    unknown: 'bg-[#f8faff] text-[#4f5d73] dark:bg-[var(--dark-hover)] dark:text-[var(--dark-muted-strong)]',
   }[status];
 
   return <span className={`w-fit rounded px-3 py-1 text-sm font-medium ${className}`}>{status}</span>;
