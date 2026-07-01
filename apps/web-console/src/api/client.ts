@@ -18,6 +18,10 @@ export class ApiClient {
     });
   }
 
+  async delete<T>(path: string, init?: RequestInit): Promise<T> {
+    return this.request<T>(path, { ...init, method: 'DELETE' });
+  }
+
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     const headers = new Headers(init?.headers);
     if (this.options.token) {

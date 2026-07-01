@@ -13,7 +13,9 @@ from app.domains.firebase.schemas import (
     FirebaseAnalyticsMetric,
     FirebaseAnalyticsSummary,
     FirebaseConfigStatus,
-    FirebaseCrashlyticsReport,
+    FirebaseEventCatalogItem,
+    FirebaseEventCatalogResponse,
+    FirebaseCrashlyticsRelease,
     FirebaseCrashlyticsReportsResponse,
     FirebaseOverviewResponse,
 )
@@ -165,32 +167,97 @@ class FirebaseService:
             breakdowns=self._analytics_breakdowns(property_id, token, days),
         )
 
+    def list_events(
+        self,
+        days: int = 30,
+        limit: int = 500,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> FirebaseEventCatalogResponse:
+        property_id = self._require("FIREBASE_GA4_PROPERTY_ID", self.settings.firebase_ga4_property_id)
+        token = self._access_token()
+        days = max(1, min(days, 90))
+
+        # Explicit YYYY-MM-DD range (from the dashboard filter) takes priority;
+        # otherwise fall back to a relative "Ndays ago" window.
+        if start_date and end_date:
+            date_range = {"startDate": start_date, "endDate": end_date}
+        else:
+            date_range = {"startDate": f"{days}daysAgo", "endDate": "today"}
+
+        payload = {
+            "dateRanges": [date_range],
+            "dimensions": [{"name": "eventName"}],
+            "metrics": [{"name": "eventCount"}, {"name": "totalUsers"}],
+            "orderBys": [{"metric": {"metricName": "eventCount"}, "desc": True}],
+            "limit": max(1, min(limit, 5000)),
+        }
+        data = self._request(
+            "POST",
+            f"https://analyticsdata.googleapis.com/v1beta/properties/{property_id}:runReport",
+            token,
+            json=payload,
+        )
+
+        metric_names = [header.get("name", "") for header in data.get("metricHeaders", [])]
+        events: list[FirebaseEventCatalogItem] = []
+        for row in data.get("rows", []):
+            event_name = row.get("dimensionValues", [{}])[0].get("value", "")
+            if not event_name:
+                continue
+            metrics = {
+                metric_name: _to_float(metric_value.get("value"))
+                for metric_name, metric_value in zip(metric_names, row.get("metricValues", []), strict=False)
+            }
+            events.append(
+                FirebaseEventCatalogItem(
+                    event_name=event_name,
+                    label=_humanize_event(event_name),
+                    event_count=int(metrics.get("eventCount", 0.0)),
+                    total_users=int(metrics.get("totalUsers", 0.0)),
+                )
+            )
+
+        return FirebaseEventCatalogResponse(
+            property_id=property_id,
+            days=days,
+            generated_at=datetime.now(UTC),
+            events=events,
+        )
+
     def crashlytics_reports(self, page_size: int = 20) -> FirebaseCrashlyticsReportsResponse:
         project_id = self._require("FIREBASE_PROJECT_ID", self.settings.firebase_project_id)
         app_id = self._require("FIREBASE_ANDROID_APP_ID", self.settings.firebase_android_app_id)
         token = self._access_token()
-        page_size = max(1, min(page_size, 100))
         escaped_app_id = quote(app_id, safe="")
 
-        data = self._request(
-            "GET",
-            f"https://firebasecrashlytics.googleapis.com/v1alpha/projects/{project_id}/apps/{escaped_app_id}/reports",
-            token,
-        )
-        reports = [
-            FirebaseCrashlyticsReport(
-                name=report.get("name", ""),
-                display_name=report.get("displayName"),
-                type=report.get("type"),
-                raw=report,
+        # Use Firebase Management API to list Android app releases (app distribution).
+        # Crashlytics crash data is only available via BigQuery export — not through REST.
+        try:
+            data = self._request(
+                "GET",
+                f"https://firebaseappdistribution.googleapis.com/v1/projects/{project_id}/apps/{escaped_app_id}/releases",
+                token,
+                params={"pageSize": min(page_size, 100)},
             )
-            for report in data.get("reports", [])
-        ]
+            releases = [
+                FirebaseCrashlyticsRelease(
+                    name=release.get("name", ""),
+                    display_version=release.get("displayVersion"),
+                    build_version=release.get("buildVersion"),
+                    create_time=release.get("createTime"),
+                    crashlytics_report=release,
+                )
+                for release in data.get("releases", [])
+            ]
+        except FirebaseApiError:
+            releases = []
+
         return FirebaseCrashlyticsReportsResponse(
             project_id=project_id,
             app_id=app_id,
             generated_at=datetime.now(UTC),
-            reports=reports,
+            releases=releases,
         )
 
     def _analytics_breakdowns(
@@ -333,6 +400,11 @@ def _to_float(value: str | None) -> float:
         return float(value)
     except ValueError:
         return 0.0
+
+
+def _humanize_event(event_name: str) -> str:
+    cleaned = event_name.replace("_", " ").strip()
+    return " ".join(word.capitalize() if word.islower() else word for word in cleaned.split())
 
 
 def _format_ga_date(value: str) -> str:

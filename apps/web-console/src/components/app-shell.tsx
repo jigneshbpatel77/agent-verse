@@ -17,6 +17,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Radar,
+  RefreshCcw,
   Search,
   ShieldAlert,
   Sun,
@@ -41,6 +42,7 @@ const analyticsSections: Array<{ key: string; label: string; icon: LucideIcon }>
   { key: 'business', label: 'Business Analytics', icon: TrendingUp },
   { key: 'monitoring', label: 'Monitoring & Alerting', icon: ShieldAlert },
   { key: 'decision', label: 'Decision Intelligence', icon: Radar },
+  { key: 'scheduler', label: 'Scheduler Monitor', icon: RefreshCcw },
 ];
 
 interface NotificationRecord {
@@ -524,6 +526,7 @@ function buildSearchResults(query: string): Array<{ label: string; href: string;
     { label: 'Business Analytics', href: '/agents/analytics?tab=business', type: 'Responsibility' },
     { label: 'Monitoring & Alerting', href: '/agents/analytics?tab=monitoring', type: 'Responsibility' },
     { label: 'Decision Intelligence', href: '/agents/analytics?tab=decision', type: 'Responsibility' },
+    { label: 'Scheduler Monitor', href: '/agents/analytics?tab=scheduler', type: 'Responsibility' },
     { label: 'RC Service Analytics', href: '/analytics/system/rc', type: 'Service Metrics' },
   ];
 

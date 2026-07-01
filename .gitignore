@@ -5,6 +5,8 @@ coverage
 .turbo
 .nx
 .venv
+venv/
+**/venv/
 __pycache__
 .pytest_cache
 .env
@@ -15,3 +17,6 @@ secrets/
 data/postgres/runtime
 data/clickhouse/runtime
 data/qdrant/runtime
+agents/*/data/
+*.db
+*.duckdb

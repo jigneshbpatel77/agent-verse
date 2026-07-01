@@ -36,7 +36,9 @@ import { Area, AreaChart, Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { ApiClient } from '@/api/client';
 import { AnimatedMetricValue } from '@/components/animated-metric-value';
 import { runtimeConfig } from '@/config/runtime';
+import BusinessAnalyticsDashboard from '@/modules/analytics/business-analytics-dashboard';
 import { MonitoringAgentControl } from '@/modules/analytics/monitoring-agent-control';
+import { SchedulerMonitor } from '@/modules/analytics/scheduler-monitor';
 import { agents, getAgent, summaryTrend } from '@/modules/dashboard/data';
 import { agentStatusPill, normalizeAgentStatus, type AgentDisplayStatus } from '@/modules/dashboard/status';
 import { useAgentUiState } from '@/state/app-ui-state';
@@ -69,15 +71,15 @@ const analyticsResponsibilities = [
     key: 'business',
     title: 'Business Analytics',
     icon: TrendingUp,
-    status: 'Planned',
+    status: 'In progress',
     summary: 'Revenue, KPIs, forecasting, ROI, cost-benefit, funnels, retention, churn, segmentation, and journey mapping.',
     output: 'Executive summary, revenue plan, growth opportunities, and feature suggestions',
     metrics: [
-      { label: 'Dashboards', value: '0' },
-      { label: 'Forecasts', value: 'Pending' },
-      { label: 'KPIs', value: 'Draft' },
+      { label: 'Dashboards', value: '1' },
+      { label: 'Sources', value: '3' },
+      { label: 'Warehouse', value: 'DuckDB' },
     ],
-    actions: ['Revenue model', 'Funnel report', 'Cohort plan'],
+    actions: ['Revenue rollup', 'RDS sync', 'Margin anomaly checks'],
   },
   {
     key: 'monitoring',
@@ -106,6 +108,20 @@ const analyticsResponsibilities = [
       { label: 'Signals', value: '4' },
     ],
     actions: ['Opportunity score', 'Action queue', 'Risk review'],
+  },
+  {
+    key: 'scheduler',
+    title: 'Scheduler Monitor',
+    icon: RotateCcw,
+    status: 'In progress',
+    summary: 'Cron & scheduled data-sync jobs: run status, success rate, failures, and execution logs.',
+    output: 'Live job health, run history, and failure diagnostics',
+    metrics: [
+      { label: 'Jobs', value: '4' },
+      { label: 'Store', value: 'DuckDB' },
+      { label: 'History', value: 'Live' },
+    ],
+    actions: ['Run history', 'Failure review', 'Next-run schedule'],
   },
 ];
 
@@ -813,6 +829,10 @@ function AnalyticsResponsibilityView({
     return <EmbeddedServiceAnalyticsDashboard agentPaused={agentPaused} />;
   }
 
+  if (responsibility.key === 'scheduler') {
+    return <SchedulerMonitor />;
+  }
+
   if (responsibility.key === 'monitoring') {
     return (
       <div className="space-y-5">
@@ -820,6 +840,10 @@ function AnalyticsResponsibilityView({
         <MonitoringAgentControl embedded agentPaused={agentPaused} />
       </div>
     );
+  }
+
+  if (responsibility.key === 'business') {
+    return <BusinessAnalyticsDashboard />;
   }
 
   return (
@@ -1068,34 +1092,42 @@ interface ServiceHealthResponse {
   raw_prometheus_queries: Record<string, string>;
 }
 
+type FirebaseAnalyticsBreakdown = {
+  name: string;
+  dimension: string;
+  rows?: Array<{ dimension: string; metrics: Record<string, number> }>;
+};
+
 interface FirebaseOverviewResponse {
-  config: {
+  config?: {
     project_id: string | null;
     ga4_property_id: string | null;
     android_app_id: string | null;
     service_account_configured: boolean;
     missing: string[];
-  };
-  analytics: {
+  } | null;
+  analytics?: {
     project_id: string;
     property_id: string;
     days: number;
     generated_at: string;
-    totals: Array<{ name: string; value: number }>;
-    daily: Array<{ date: string; metrics: Record<string, number> }>;
-    breakdowns: Array<{
-      name: string;
-      dimension: string;
-      rows: Array<{ dimension: string; metrics: Record<string, number> }>;
-    }>;
+    totals?: Array<{ name: string; value: number }>;
+    daily?: Array<{ date: string; metrics: Record<string, number> }>;
+    breakdowns?: FirebaseAnalyticsBreakdown[];
   } | null;
-  crashlytics: {
+  crashlytics?: {
     project_id: string;
     app_id: string;
     generated_at: string;
-    reports: Array<{ name: string; display_name: string | null; type: string | null }>;
+    releases?: Array<{
+      name: string;
+      display_version: string | null;
+      build_version: string | null;
+      create_time: string | null;
+    }>;
+    reports?: Array<{ name: string; display_name: string | null; type: string | null }>;
   } | null;
-  errors: string[];
+  errors?: string[];
 }
 
 type CommanderTone = 'healthy' | 'info' | 'warning' | 'critical' | 'unknown';
@@ -1231,8 +1263,8 @@ function FirebaseSignalsPanel({ agentPaused }: { agentPaused: boolean }) {
   const activeUsersTrend = firebaseMetricTrend(overview, 'activeUsers');
   const sessionsTrend = firebaseMetricTrend(overview, 'sessions');
   const viewsTrend = firebaseMetricTrend(overview, 'screenPageViews');
-  const reportsCount = overview?.crashlytics?.reports.length ?? 0;
-  const missing = overview?.config.missing ?? [];
+  const reportsCount = overview?.crashlytics?.reports?.length ?? overview?.crashlytics?.releases?.length ?? 0;
+  const missing = overview?.config?.missing ?? [];
   const firebaseErrors = overview?.errors ?? [];
   const breakdowns = overview?.analytics?.breakdowns ?? [];
   const setupMessages = firebaseSetupMessages({ missing, errors: firebaseErrors, error });
@@ -1559,7 +1591,7 @@ function FirebaseMiniStat({
 function FirebaseBreakdownSummary({
   breakdowns,
 }: {
-  breakdowns: NonNullable<FirebaseOverviewResponse['analytics']>['breakdowns'];
+  breakdowns: FirebaseAnalyticsBreakdown[];
 }) {
   return (
     <article className="app-surface-subtle mt-4 rounded-lg p-4">
@@ -1574,6 +1606,7 @@ function FirebaseBreakdownSummary({
       <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
         {breakdowns.slice(0, 4).map((breakdown) => {
           const primaryMetric = preferredFirebaseMetric(breakdown);
+          const rows = breakdown.rows ?? [];
           return (
             <div key={breakdown.name} className="rounded-lg bg-white/70 p-3 ring-1 ring-[#e6eaf2] dark:bg-[var(--dark-bg)] dark:ring-[var(--dark-border)]">
               <div className="flex items-start justify-between gap-2">
@@ -1582,12 +1615,12 @@ function FirebaseBreakdownSummary({
                   <p className="app-muted mt-0.5 truncate text-xs">{formatFirebaseMetricLabel(primaryMetric)}</p>
                 </div>
                 <span className="app-muted shrink-0 text-xs">
-                  Top {Math.min(3, breakdown.rows.length)} of {breakdown.rows.length}
+                  Top {Math.min(3, rows.length)} of {rows.length}
                 </span>
               </div>
               <div className="mt-3 space-y-2">
-                {breakdown.rows.length ? (
-                  breakdown.rows.slice(0, 3).map((row) => (
+                {rows.length ? (
+                  rows.slice(0, 3).map((row) => (
                     <div key={`${breakdown.name}-${row.dimension}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs">
                       <span className="truncate font-medium text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">{row.dimension || '(not set)'}</span>
                       <span className="font-mono font-semibold text-[#111827] dark:text-[var(--dark-text)]">
@@ -1610,10 +1643,11 @@ function FirebaseBreakdownSummary({
 function FirebaseBreakdownTable({
   breakdown,
 }: {
-  breakdown: NonNullable<FirebaseOverviewResponse['analytics']>['breakdowns'][number];
+  breakdown: FirebaseAnalyticsBreakdown;
 }) {
   const primaryMetric = preferredFirebaseMetric(breakdown);
   const secondaryMetric = secondaryFirebaseMetric(breakdown, primaryMetric);
+  const rows = breakdown.rows ?? [];
 
   return (
     <article className="app-surface-subtle rounded-lg p-4">
@@ -1622,11 +1656,11 @@ function FirebaseBreakdownTable({
           <h3 className="app-heading text-sm font-semibold">{breakdown.name}</h3>
           <p className="app-muted mt-1 text-xs">{breakdown.dimension}</p>
         </div>
-        <span className="app-muted text-xs">{breakdown.rows.length} rows</span>
+        <span className="app-muted text-xs">{rows.length} rows</span>
       </div>
       <div className="mt-3 space-y-2">
-        {breakdown.rows.length ? (
-          breakdown.rows.slice(0, 5).map((row) => (
+        {rows.length ? (
+          rows.slice(0, 5).map((row) => (
             <div key={`${breakdown.name}-${row.dimension}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md bg-white px-3 py-2 text-sm dark:bg-[var(--dark-bg)]">
               <span className="truncate font-medium text-[#111827] dark:text-[var(--dark-text)]">{row.dimension || '(not set)'}</span>
               <span className="font-mono text-xs font-semibold text-[#4f5d73] dark:text-[var(--dark-muted-strong)]">
@@ -1657,7 +1691,7 @@ function firebaseMetricValue(overview: FirebaseOverviewResponse | null, name: st
   const daily = overview?.analytics?.daily ?? [];
   const latestDailyValue = daily[daily.length - 1]?.metrics[name];
 
-  return latestDailyValue ?? overview?.analytics?.totals.find((metric) => metric.name === name)?.value ?? null;
+  return latestDailyValue ?? overview?.analytics?.totals?.find((metric) => metric.name === name)?.value ?? null;
 }
 
 type FirebaseMetricComparison = {
@@ -1705,8 +1739,8 @@ function firebaseMetricTrend(overview: FirebaseOverviewResponse | null, metricNa
     });
 }
 
-function preferredFirebaseMetric(breakdown: NonNullable<FirebaseOverviewResponse['analytics']>['breakdowns'][number]) {
-  const firstRow = breakdown.rows[0];
+function preferredFirebaseMetric(breakdown: FirebaseAnalyticsBreakdown) {
+  const firstRow = breakdown.rows?.[0];
   if (!firstRow) {
     return 'activeUsers';
   }
@@ -1715,10 +1749,10 @@ function preferredFirebaseMetric(breakdown: NonNullable<FirebaseOverviewResponse
 }
 
 function secondaryFirebaseMetric(
-  breakdown: NonNullable<FirebaseOverviewResponse['analytics']>['breakdowns'][number],
+  breakdown: FirebaseAnalyticsBreakdown,
   primaryMetric: string,
 ) {
-  const metricNames = Object.keys(breakdown.rows[0]?.metrics ?? {});
+  const metricNames = Object.keys(breakdown.rows?.[0]?.metrics ?? {});
   return metricNames.find((metric) => metric !== primaryMetric) ?? null;
 }
 
@@ -2083,7 +2117,8 @@ function EmbeddedServiceAnalyticsDashboard({ agentPaused }: { agentPaused: boole
     };
   }, [serviceKey]);
 
-  const missingCount = health?.missing_metrics.length ?? 0;
+  const missingMetrics = health?.missing_metrics ?? [];
+  const missingCount = missingMetrics.length;
   const metricCards = buildEmbeddedMetricCards(serviceKey, health);
   const availableCount = metricCards.filter((card) => card.value !== null).length;
   const totalSignals = metricCards.length;

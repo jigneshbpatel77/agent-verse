@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VehicleInfo — Business Analytics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #1c2128;
+      --surface3:  #21262d;
+      --border:    #30363d;
+      --border2:   #21262d;
+      --text:      #e6edf3;
+      --text2:     #8b949e;
+      --text3:     #656d76;
+      --purple:    #7c3aed;
+      --purple2:   #a78bfa;
+      --purpleB:   rgba(124,58,237,0.15);
+      --green:     #3fb950;
+      --greenB:    rgba(63,185,80,0.12);
+      --amber:     #d29922;
+      --amberB:    rgba(210,153,34,0.12);
+      --red:       #f85149;
+      --blue:      #58a6ff;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── NAVBAR ─── */
+    .nav {
+      position: sticky; top: 0; z-index: 200;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      height: 56px;
+      display: flex; align-items: center;
+      padding: 0 20px; gap: 14px;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 9px;
+      font-size: 15px; font-weight: 700; color: var(--text);
+      text-decoration: none; flex-shrink: 0; user-select: none;
+    }
+    .nav-logo-icon {
+      width: 30px; height: 30px;
+      background: var(--purple);
+      border-radius: 7px;
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .nav-search {
+      flex: 1; max-width: 420px;
+      position: relative;
+    }
+    .nav-search input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 80px 6px 34px;
+      color: var(--text);
+      font-size: 13px; font-family: inherit;
+      outline: none; transition: border-color 0.15s;
+    }
+    .nav-search input:focus { border-color: var(--purple); }
+    .nav-search input::placeholder { color: var(--text3); }
+    .nav-search-icon {
+      position: absolute; left: 10px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--text3); pointer-events: none;
+    }
+    .nav-kbd {
+      position: absolute; right: 8px; top: 50%;
+      transform: translateY(-50%);
+      display: flex; gap: 3px; align-items: center;
+    }
+    .kbd {
+      font-size: 10px; padding: 1px 5px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text3); background: var(--surface2);
+      font-family: inherit;
+    }
+    .nav-right { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+    .icon-btn {
+      width: 34px; height: 34px;
+      border: none; background: transparent;
+      color: var(--text2); cursor: pointer;
+      border-radius: 6px;
+      display: grid; place-items: center;
+      transition: background 0.15s, color 0.15s;
+      position: relative; flex-shrink: 0;
+    }
+    .icon-btn:hover { background: var(--surface2); color: var(--text); }
+    .notif-dot {
+      position: absolute; top: 6px; right: 6px;
+      width: 7px; height: 7px;
+      background: var(--red); border-radius: 50%;
+      border: 2px solid var(--surface);
+    }
+
+    /* ─── LAYOUT ─── */
+    .layout { display: flex; min-height: calc(100vh - 56px); }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      width: 228px; flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 14px 10px;
+      position: sticky; top: 56px;
+      height: calc(100vh - 56px);
+      overflow-y: auto;
+    }
+    .sb-section { margin-bottom: 22px; }
+    .sb-label {
+      font-size: 10.5px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text3); padding: 0 8px;
+      margin-bottom: 4px;
+    }
+    .sb-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 7px 8px; border-radius: 6px;
+      color: var(--text2); cursor: pointer;
+      font-size: 13px; font-weight: 500;
+      text-decoration: none;
+      transition: background 0.12s, color 0.12s;
+      white-space: nowrap;
+    }
+    .sb-item:hover { background: var(--surface2); color: var(--text); }
+    .sb-item.active {
+      background: var(--purpleB);
+      color: var(--purple2);
+    }
+    .sb-item svg { flex-shrink: 0; }
+
+    /* ─── MAIN ─── */
+    .main {
+      flex: 1; padding: 22px 24px;
+      min-width: 0;
+    }
+    .stack > * + * { margin-top: 22px; }
+
+    /* ─── BUTTONS ─── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: 6px;
+      font-size: 13px; font-weight: 500;
+      cursor: pointer; font-family: inherit;
+      transition: all 0.15s; border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .btn-ghost { background: transparent; color: var(--text2); }
+    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+    .btn-primary { background: var(--purple); color: #fff; border-color: var(--purple); }
+    .btn-primary:hover { background: #6d28d9; }
+    .btn-sm { padding: 5px 11px; font-size: 12px; }
+
+    /* ─── AGENT STATUS BAR ─── */
+    .agent-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .agent-icon {
+      width: 46px; height: 46px; flex-shrink: 0;
+      background: var(--purpleB);
+      border-radius: 10px;
+      display: grid; place-items: center;
+    }
+    .agent-info { flex: 1; min-width: 0; }
+    .agent-name {
+      font-size: 17px; font-weight: 700;
+      display: flex; align-items: center; gap: 9px;
+    }
+    .badge-active {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11.5px; font-weight: 600;
+      padding: 2px 9px; border-radius: 20px;
+      background: var(--greenB); color: var(--green);
+    }
+    .badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor;
+      animation: blink 2s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .agent-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+    .agent-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    /* ─── DATE RANGE BAR ─── */
+    .dr-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 22px;
+    }
+    .dr-row {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; flex-wrap: wrap; gap: 14px;
+    }
+    .dr-title { font-size: 19px; font-weight: 700; }
+    .dr-source { font-size: 11.5px; color: var(--text3); margin-top: 4px; }
+    .dr-applied { font-size: 11px; color: var(--text3); margin-top: 2px; }
+    .dr-inputs { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+    .dr-group { display: flex; flex-direction: column; gap: 4px; }
+    .dr-label {
+      font-size: 10.5px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text3);
+    }
+    .dr-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 10px;
+      color: var(--text); font-size: 13px;
+      font-family: inherit; outline: none;
+      cursor: pointer; min-width: 138px;
+      transition: border-color 0.15s;
+    }
+    .dr-input:focus { border-color: var(--purple); }
+    .dr-input::-webkit-calendar-picker-indicator {
+      filter: invert(0.6) sepia(1) saturate(2) hue-rotate(200deg);
+      cursor: pointer; opacity: 0.7;
+    }
+    .dr-input:hover::-webkit-calendar-picker-indicator { opacity: 1; }
+
+    /* ─── SUMMARY CARDS ─── */
+    .g4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+    .g3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+    .g2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 18px 20px;
+    }
+    .card-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+    .card-lbl { font-size: 12.5px; font-weight: 600; color: var(--text2); }
+    .card-ico {
+      width: 34px; height: 34px; border-radius: 8px;
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .ico-green  { background: var(--greenB); color: var(--green); }
+    .ico-amber  { background: var(--amberB); color: var(--amber); }
+    .ico-purple { background: var(--purpleB); color: var(--purple2); }
+    .ico-blue   { background: rgba(88,166,255,0.12); color: var(--blue); }
+    .card-val { font-size: 25px; font-weight: 700; letter-spacing: -0.4px; }
+
+    /* ─── SECTION HEADER ─── */
+    .sec-head { margin-bottom: 14px; }
+    .sec-title { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+    .sec-sub { font-size: 12.5px; color: var(--text3); }
+
+    /* ─── SERVICE CARDS ─── */
+    .svc-card-top {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 12px;
+      margin-bottom: 18px;
+    }
+    .svc-card-ico {
+      width: 38px; height: 38px; border-radius: 9px;
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .svc-title { font-size: 14.5px; font-weight: 600; }
+    .svc-desc { font-size: 11.5px; color: var(--text3); margin-top: 3px; }
+    .svc-amount { font-size: 24px; font-weight: 700; margin-bottom: 14px; }
+    .metric-box {
+      border: 1px solid var(--border2);
+      border-radius: 7px; padding: 9px 12px;
+    }
+    .metric-lbl { font-size: 10.5px; color: var(--text3); margin-bottom: 3px; }
+    .metric-val { font-size: 14px; font-weight: 600; }
+    .card-note {
+      font-size: 11px; color: var(--text3);
+      margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid var(--border2);
+    }
+
+    /* ─── INSURANCE TABLE ─── */
+    .ins-card { padding: 20px 22px; }
+    .ins-head {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 14px;
+      margin-bottom: 18px; flex-wrap: wrap;
+    }
+    .ins-head-left { display: flex; align-items: center; gap: 8px; }
+    .ins-head-title { font-size: 15px; font-weight: 700; }
+    .ins-head-sub { font-size: 12px; color: var(--text3); margin-top: 3px; }
+    .ins-note {
+      display: flex; align-items: flex-start; gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 8px; padding: 8px 12px;
+      font-size: 11.5px; color: var(--text2);
+      max-width: 420px;
+    }
+    .ins-note-icon { color: var(--purple2); flex-shrink: 0; margin-top: 1px; }
+    .ins-table {
+      border: 1px solid var(--border);
+      border-radius: 8px; overflow: hidden;
+    }
+    .ins-thead {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      padding: 9px 16px;
+    }
+    .ins-thead span {
+      font-size: 10.5px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text3);
+    }
+    .ins-thead span:nth-child(2) { text-align: center; }
+    .ins-thead span:nth-child(3) { text-align: right; }
+    .ins-row {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      padding: 13px 16px; align-items: center;
+      border-bottom: 1px solid var(--border2);
+    }
+    .ins-row:last-child { border-bottom: none; }
+    .ins-row.ins-total {
+      background: var(--surface2);
+      border-top: 1px solid var(--border);
+      font-weight: 700;
+    }
+    .ins-cat { font-size: 13.5px; font-weight: 600; }
+    .ins-rate { font-size: 11px; color: var(--text3); margin-top: 2px; }
+    .ins-sales { text-align: center; font-size: 13.5px; font-weight: 600; }
+    .ins-rev { text-align: right; font-size: 13.5px; font-weight: 600; color: var(--green); }
+
+    /* ─── SPEND BREAKDOWN ─── */
+    .spend-g { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    .spend-col-title {
+      font-size: 10.5px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--text3); margin-bottom: 10px;
+    }
+    .spend-row {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border2);
+    }
+    .spend-row:last-child { border-bottom: none; }
+    .spend-row-lbl { font-size: 13px; color: var(--text2); }
+    .spend-row-val { font-size: 13px; font-weight: 600; }
+    .spend-total { color: var(--purple2); }
+
+    /* ─── CAC CALCULATOR ─── */
+    .cac-g { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    .cac-item {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 8px; padding: 13px 14px;
+    }
+    .cac-lbl { font-size: 11.5px; color: var(--text3); margin-bottom: 5px; }
+    .cac-val { font-size: 18px; font-weight: 700; }
+    .cac-sub { font-size: 10.5px; color: var(--text3); margin-top: 3px; }
+
+    /* ─── USER METRICS ─── */
+    .trend-up   { font-size: 11.5px; font-weight: 500; color: var(--green); margin-top: 7px; }
+    .trend-flat { font-size: 11.5px; font-weight: 500; color: var(--text3); margin-top: 7px; }
+
+    /* ─── DATA REQUIREMENTS PANEL ─── */
+    .req-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden;
+    }
+    .req-panel summary {
+      padding: 14px 18px;
+      font-size: 13.5px; font-weight: 600;
+      cursor: pointer; user-select: none;
+      display: flex; align-items: center; gap: 8px;
+      list-style: none;
+    }
+    .req-panel summary::-webkit-details-marker { display: none; }
+    .req-panel summary:hover { background: var(--surface2); }
+    .req-panel[open] summary { border-bottom: 1px solid var(--border); }
+    .req-body { padding: 18px; }
+    .req-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .req-table th {
+      text-align: left; padding: 8px 12px;
+      font-size: 10.5px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--text3);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .req-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border2);
+      vertical-align: top;
+      color: var(--text2);
+    }
+    .req-table tr:last-child td { border-bottom: none; }
+    .req-table td:first-child { font-weight: 600; color: var(--text); white-space: nowrap; }
+    .tag {
+      display: inline-block; padding: 1px 7px;
+      border-radius: 4px; font-size: 10.5px; font-weight: 600;
+      margin-right: 3px;
+    }
+    .tag-purple { background: var(--purpleB); color: var(--purple2); }
+    .tag-green  { background: var(--greenB);  color: var(--green); }
+    .tag-amber  { background: var(--amberB);  color: var(--amber); }
+
+    /* ─── FOOTER ─── */
+    .footer {
+      text-align: center;
+      font-size: 11.5px; color: var(--text3);
+      padding: 20px; margin-top: 4px;
+    }
+
+    /* ─── SCROLLBAR ─── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 1200px) {
+      .g4 { grid-template-columns: repeat(2,1fr); }
+      .cac-g { grid-template-columns: repeat(2,1fr); }
+    }
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .g3, .g4 { grid-template-columns: 1fr; }
+      .spend-g { grid-template-columns: 1fr; }
+      .agent-actions { display: none; }
+      .main { padding: 14px; }
+      .nav { padding: 0 14px; }
+    }
+    @media (max-width: 640px) {
+      .g2 { grid-template-columns: 1fr; }
+      .cac-g { grid-template-columns: 1fr; }
+      .dr-row { flex-direction: column; }
+      .ins-note { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════ NAVBAR ═══════════════════════ -->
+<nav class="nav">
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-icon">
+      <!-- car/vehicle icon -->
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h13l4 4v4a2 2 0 0 1-2 2h-2"/>
+        <circle cx="8" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>
+        <path d="M3 9h13"/>
+      </svg>
+    </div>
+    VehicleInfo
+  </a>
+
+  <div class="nav-search">
+    <svg class="nav-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+    <input type="text" placeholder="Search anything..." id="searchInput" autocomplete="off" />
+    <div class="nav-kbd">
+      <span class="kbd">⌘</span>
+      <span class="kbd">K</span>
+    </div>
+  </div>
+
+  <div class="nav-right">
+    <button class="icon-btn" id="themeBtn" title="Toggle theme (placeholder)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+      </svg>
+    </button>
+    <button class="icon-btn" title="Notifications">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+      <span class="notif-dot"></span>
+    </button>
+    <button class="icon-btn" title="Help">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+        <path d="M12 17h.01"/>
+      </svg>
+    </button>
+  </div>
+</nav>
+
+<!-- ═══════════════════════ LAYOUT ═══════════════════════ -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-section">
+      <div class="sb-label">Platform</div>
+      <a href="#" class="sb-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+        Overview
+      </a>
+      <a href="#" class="sb-item active">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+        Analytics Agent
+      </a>
+      <a href="#" class="sb-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Monitoring Agent
+      </a>
+    </div>
+    <div class="sb-section">
+      <div class="sb-label">Revenue Sources</div>
+      <a href="#" class="sb-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><path d="M14 8H8M16 12H8M13 16H8"/></svg>
+        Challan Payments
+      </a>
+      <a href="#" class="sb-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+        Service History
+      </a>
+      <a href="#" class="sb-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg>
+        FASTag Orders
+      </a>
+      <a href="#" class="sb-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Insurance (PB)
+      </a>
+    </div>
+    <div class="sb-section">
+      <div class="sb-label">Configuration</div>
+      <a href="#" class="sb-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        Settings
+      </a>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <main class="main">
+    <div class="stack">
+
+      <!-- ── Agent Status Bar ── -->
+      <div class="agent-bar">
+        <div class="agent-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>
+          </svg>
+        </div>
+        <div class="agent-info">
+          <div class="agent-name">
+            Analytics Agent
+            <span class="badge-active" id="agentBadge">
+              <span class="badge-dot"></span>
+              Active
+            </span>
+          </div>
+          <div class="agent-meta">Version v1.8.2 &middot; Last activity <span id="agentTime">42s</span> ago</div>
+        </div>
+        <div class="agent-actions">
+          <button class="btn btn-ghost" id="pauseBtn" onclick="toggleAgent()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/>
+            </svg>
+            Pause Agent
+          </button>
+          <button class="btn btn-primary" onclick="alert('Log viewer — connect real API to enable.')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m5 3 14 9-14 9V3z"/>
+            </svg>
+            View Logs
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Date Range Bar ── -->
+      <div class="dr-bar">
+        <div class="dr-row">
+          <div>
+            <div class="dr-title">Business Analytics</div>
+            <div class="dr-source">Data source: Live DuckDB &middot; Policybazaar insurance revenue (Bike/Car/CV) &middot; Mock placeholders for non-integrated sections</div>
+            <div class="dr-applied" id="appliedLabel">Applied range: 2026-06-18 to 2026-06-24</div>
+          </div>
+          <div class="dr-inputs">
+            <div class="dr-group">
+              <label class="dr-label" for="startDate">Start</label>
+              <input type="date" class="dr-input" id="startDate" value="2026-06-18" />
+            </div>
+            <div class="dr-group">
+              <label class="dr-label" for="endDate">End</label>
+              <input type="date" class="dr-input" id="endDate" value="2026-06-24" />
+            </div>
+            <button class="btn btn-primary" onclick="applyRange()">
+              Apply
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Summary Cards ── -->
+      <div class="g4">
+        <!-- Total Revenue -->
+        <article class="card">
+          <div class="card-row">
+            <span class="card-lbl">Total Revenue</span>
+            <span class="card-ico ico-green">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/>
+              </svg>
+            </span>
+          </div>
+          <div class="card-val">₹1,78,05,004</div>
+        </article>
+
+        <!-- Total Spend -->
+        <article class="card">
+          <div class="card-row">
+            <span class="card-lbl">Total Spend</span>
+            <span class="card-ico ico-amber">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/>
+              </svg>
+            </span>
+          </div>
+          <div class="card-val">₹66,97,822</div>
+        </article>
+
+        <!-- Net Profit -->
+        <article class="card">
+          <div class="card-row">
+            <span class="card-lbl">Net Profit</span>
+            <span class="card-ico ico-green">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+                <polyline points="16 7 22 7 22 13"/>
+              </svg>
+            </span>
+          </div>
+          <div class="card-val">₹1,11,07,183</div>
+        </article>
+
+        <!-- ROI -->
+        <article class="card">
+          <div class="card-row">
+            <span class="card-lbl">ROI</span>
+            <span class="card-ico ico-purple">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="16" height="20" x="4" y="2" rx="2"/>
+                <path d="M8 10h8M8 14h4M8 6h8"/>
+              </svg>
+            </span>
+          </div>
+          <div class="card-val">2.7×</div>
+        </article>
+      </div>
+
+      <!-- ── Service-wise Revenue ── -->
+      <section>
+        <div class="sec-head">
+          <div class="sec-title">Service-wise Revenue</div>
+          <div class="sec-sub">Total revenue and order count by service for the selected date range.</div>
+        </div>
+        <div class="g3">
+
+          <!-- Challan Payments -->
+          <article class="card">
+            <div class="svc-card-top">
+              <div>
+                <div class="svc-title">Challan payments</div>
+                <div class="svc-desc">Convenience fee per payment</div>
+              </div>
+              <span class="svc-card-ico ico-purple">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/>
+                  <path d="M14 8H8M16 12H8M13 16H8"/>
+                </svg>
+              </span>
+            </div>
+            <div class="svc-amount">₹1,50,85,164</div>
+            <div class="metric-box">
+              <div class="metric-lbl">Total Orders</div>
+              <div class="metric-val">37,596</div>
+            </div>
+            <div class="card-note">Avg. ₹40.13 / payment &middot; Fee ₹20–25 + 18% GST</div>
+          </article>
+
+          <!-- Service History -->
+          <article class="card">
+            <div class="svc-card-top">
+              <div>
+                <div class="svc-title">Service history</div>
+                <div class="svc-desc">Agent fee + gateway fee − refunds</div>
+              </div>
+              <span class="svc-card-ico ico-purple">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+                </svg>
+              </span>
+            </div>
+            <div class="svc-amount">₹9,39,817</div>
+            <div class="metric-box">
+              <div class="metric-lbl">Total Orders</div>
+              <div class="metric-val">5,207</div>
+            </div>
+            <div class="card-note">Avg. ₹180.50 / order &middot; Agent fee + gateway − refunds</div>
+          </article>
+
+          <!-- FASTag Orders -->
+          <article class="card">
+            <div class="svc-card-top">
+              <div>
+                <div class="svc-title">FASTag orders</div>
+                <div class="svc-desc">Captured − refunded, failed count tracked</div>
+              </div>
+              <span class="svc-card-ico ico-purple">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/>
+                </svg>
+              </span>
+            </div>
+            <div class="svc-amount">₹423</div>
+            <div class="metric-box">
+              <div class="metric-lbl">Total Orders</div>
+              <div class="metric-val">217</div>
+            </div>
+            <div class="card-note">Avg. ₹1.95 / order &middot; RDS live sync pending</div>
+          </article>
+
+        </div>
+      </section>
+
+      <!-- ── Insurance Revenue ── -->
+      <section>
+        <div class="card ins-card">
+          <div class="ins-head">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <div class="ins-head-title">Insurance Revenue — Policybazaar Affiliate</div>
+              </div>
+              <div class="ins-head-sub">Bike, Car &amp; CV affiliate revenue from date-wise confirmed Policybazaar counts.</div>
+            </div>
+            <div class="ins-note">
+              <svg class="ins-note-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+              </svg>
+              <span>Bike, Car &amp; CV Policybazaar affiliate counts from daily email reports. Each row = confirmed bookings × fixed rate.</span>
+            </div>
+          </div>
+          <div class="ins-table">
+            <div class="ins-thead">
+              <span>Category</span>
+              <span>Total Sales</span>
+              <span>Revenue</span>
+            </div>
+            <div class="ins-row">
+              <div>
+                <div class="ins-cat">Bike</div>
+                <div class="ins-rate">₹200 / sale</div>
+              </div>
+              <div class="ins-sales">503</div>
+              <div class="ins-rev">₹1,00,600</div>
+            </div>
+            <div class="ins-row">
+              <div>
+                <div class="ins-cat">Car</div>
+                <div class="ins-rate">₹600 / sale</div>
+              </div>
+              <div class="ins-sales">145</div>
+              <div class="ins-rev">₹87,000</div>
+            </div>
+            <div class="ins-row">
+              <div>
+                <div class="ins-cat">CV</div>
+                <div class="ins-rate">₹1,200 / sale</div>
+              </div>
+              <div class="ins-sales">16</div>
+              <div class="ins-rev">₹19,200</div>
+            </div>
+            <div class="ins-row ins-total">
+              <div class="ins-cat">Total</div>
+              <div class="ins-sales">664</div>
+              <div class="ins-rev">₹2,06,800</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Spend Breakdown ── -->
+      <section>
+        <div class="card">
+          <div class="sec-head">
+            <div class="sec-title">Spend Breakdown</div>
+            <div class="sec-sub">Advertising and operational costs for the selected date range.</div>
+          </div>
+          <div class="spend-g">
+            <div>
+              <div class="spend-col-title">Ad Spend</div>
+              <div class="spend-row">
+                <span class="spend-row-lbl">WhatsApp CRM</span>
+                <span class="spend-row-val">₹1,68,000</span>
+              </div>
+              <div class="spend-row">
+                <span class="spend-row-lbl">Challan Ads</span>
+                <span class="spend-row-val">₹2,44,000</span>
+              </div>
+              <div class="spend-row">
+                <span class="spend-row-lbl">Insurance Ads</span>
+                <span class="spend-row-val">₹1,86,000</span>
+              </div>
+              <div class="spend-row">
+                <span class="spend-row-lbl" style="font-weight:600;color:var(--text2);">Ad Spend Total</span>
+                <span class="spend-row-val">₹5,98,000</span>
+              </div>
+            </div>
+            <div>
+              <div class="spend-col-title">Operations</div>
+              <div class="spend-row">
+                <span class="spend-row-lbl">Razorpay Gateway Fees</span>
+                <span class="spend-row-val">₹4,80,000</span>
+              </div>
+              <div class="spend-row">
+                <span class="spend-row-lbl">Vendor Payouts</span>
+                <span class="spend-row-val">₹3,12,822</span>
+              </div>
+              <div class="spend-row">
+                <span class="spend-row-lbl">User Refunds</span>
+                <span class="spend-row-val">₹1,75,000</span>
+              </div>
+              <div class="spend-row">
+                <span class="spend-row-lbl" style="font-weight:600;color:var(--text2);">Total Spend</span>
+                <span class="spend-row-val spend-total">₹66,97,822</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── CAC & Efficiency Calculator ── -->
+      <section>
+        <div class="card">
+          <div class="sec-head">
+            <div class="sec-title">CAC &amp; Efficiency Calculator</div>
+            <div class="sec-sub">Customer acquisition cost and revenue efficiency metrics for the selected range.</div>
+          </div>
+          <div class="cac-g">
+            <div class="cac-item">
+              <div class="cac-lbl">Challan CAC</div>
+              <div class="cac-val">₹19.56</div>
+              <div class="cac-sub">Challan ad spend ÷ challan orders</div>
+            </div>
+            <div class="cac-item">
+              <div class="cac-lbl">Insurance CAC (per click)</div>
+              <div class="cac-val">₹24.93</div>
+              <div class="cac-sub">Insurance ad spend ÷ insurance clicks</div>
+            </div>
+            <div class="cac-item">
+              <div class="cac-lbl">Overall CAC</div>
+              <div class="cac-val">₹32.46</div>
+              <div class="cac-sub">Total ad spend ÷ new signups this month</div>
+            </div>
+            <div class="cac-item">
+              <div class="cac-lbl">Revenue per ₹1 Ad Spent</div>
+              <div class="cac-val" style="color:var(--green);">₹29.77</div>
+              <div class="cac-sub">Total revenue ÷ total ad spend</div>
+            </div>
+            <div class="cac-item">
+              <div class="cac-lbl">New Signups (this month)</div>
+              <div class="cac-val">18,420</div>
+              <div class="cac-sub">New user registrations in period</div>
+            </div>
+            <div class="cac-item">
+              <div class="cac-lbl">Challan Conversions</div>
+              <div class="cac-val">12,480</div>
+              <div class="cac-sub">Paid challan orders from ad traffic</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── User Metrics ── -->
+      <section>
+        <div class="sec-head">
+          <div class="sec-title">User Metrics</div>
+          <div class="sec-sub">Active users and engagement metrics for the selected period.</div>
+        </div>
+        <div class="g3">
+          <article class="card">
+            <div class="card-row">
+              <span class="card-lbl">Daily Active Users (DAU)</span>
+              <span class="card-ico ico-blue">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </span>
+            </div>
+            <div class="card-val">48,260</div>
+            <div class="trend-up">↑ +12.4% vs last week</div>
+          </article>
+          <article class="card">
+            <div class="card-row">
+              <span class="card-lbl">Monthly Active Users (MAU)</span>
+              <span class="card-ico ico-purple">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </span>
+            </div>
+            <div class="card-val">4,38,900</div>
+            <div class="trend-up">↑ +8.1% vs last month</div>
+          </article>
+          <article class="card">
+            <div class="card-row">
+              <span class="card-lbl">New Signups this month</span>
+              <span class="card-ico ico-amber">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>
+                </svg>
+              </span>
+            </div>
+            <div class="card-val">18,420</div>
+            <div class="trend-flat">→ +2.3% vs last period</div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ── Implementation Plan & Data Requirements ── -->
+      <details class="req-panel">
+        <summary>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+          </svg>
+          Implementation Plan &amp; Data Requirements
+          <span style="margin-left:auto;font-size:11px;color:var(--text3);font-weight:400;">Click to expand</span>
+        </summary>
+        <div class="req-body">
+
+          <div style="margin-bottom:22px;">
+            <div style="font-size:14px;font-weight:700;margin-bottom:10px;">
+              Metric Calculation Logic
+            </div>
+            <table class="req-table">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Formula</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Total Revenue</td>
+                  <td>Challan revenue + Service history revenue + FASTag revenue + Insurance revenue</td>
+                  <td><span class="tag tag-purple">DuckDB</span> all service tables + policybazaar_*_daily</td>
+                </tr>
+                <tr>
+                  <td>Total Spend</td>
+                  <td>vendor_payouts + gateway_fees + user_refunds + ad_spend (manual/CRM)</td>
+                  <td><span class="tag tag-amber">RDS</span> payment tables + manual config</td>
+                </tr>
+                <tr>
+                  <td>Net Profit</td>
+                  <td>Total Revenue − Total Spend</td>
+                  <td>Computed</td>
+                </tr>
+                <tr>
+                  <td>ROI</td>
+                  <td>Total Revenue ÷ Total Spend</td>
+                  <td>Computed</td>
+                </tr>
+                <tr>
+                  <td>Challan Revenue</td>
+                  <td>SUM(convenience_fee + gst) WHERE payment_date BETWEEN start AND end</td>
+                  <td><span class="tag tag-amber">RDS</span> challan_payment table</td>
+                </tr>
+                <tr>
+                  <td>Service History Revenue</td>
+                  <td>SUM(agent_fee + gateway_fee − refund) WHERE created_at BETWEEN dates</td>
+                  <td><span class="tag tag-amber">RDS</span> service_history_payments table</td>
+                </tr>
+                <tr>
+                  <td>FASTag Revenue</td>
+                  <td>SUM(amount) WHERE status='captured' AND created_at BETWEEN dates</td>
+                  <td><span class="tag tag-amber">RDS</span> buy_fastag_payment table</td>
+                </tr>
+                <tr>
+                  <td>Insurance Revenue (Bike)</td>
+                  <td>SUM(bike_sale_count) × ₹200 WHERE report_date BETWEEN dates</td>
+                  <td><span class="tag tag-purple">DuckDB</span> policybazaar_bike_daily</td>
+                </tr>
+                <tr>
+                  <td>Insurance Revenue (Car)</td>
+                  <td>SUM(car_sale_count) × ₹600 WHERE report_date BETWEEN dates</td>
+                  <td><span class="tag tag-purple">DuckDB</span> policybazaar_car_daily</td>
+                </tr>
+                <tr>
+                  <td>Insurance Revenue (CV)</td>
+                  <td>SUM(cv_sale_count) × ₹1200 WHERE report_date BETWEEN dates</td>
+                  <td><span class="tag tag-purple">DuckDB</span> policybazaar_cv_daily</td>
+                </tr>
+                <tr>
+                  <td>Challan CAC</td>
+                  <td>challan_ad_spend ÷ challan_order_count</td>
+                  <td>Config + DuckDB</td>
+                </tr>
+                <tr>
+                  <td>ROI (revenue efficiency)</td>
+                  <td>Total Revenue ÷ Total Ad Spend</td>
+                  <td>Computed</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="margin-bottom:22px;">
+            <div style="font-size:14px;font-weight:700;margin-bottom:10px;">
+              DB Fields Required per Section
+            </div>
+            <table class="req-table">
+              <thead>
+                <tr>
+                  <th>Section</th>
+                  <th>Table / Source</th>
+                  <th>Key Fields</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Challan Payments</td>
+                  <td>RDS → challan_payment</td>
+                  <td>challan_no, payment_date, challan_amount, convenience_fee, gst, status</td>
+                </tr>
+                <tr>
+                  <td>Service History</td>
+                  <td>RDS → service_history_payments</td>
+                  <td>order_id, created_at, agent_fee, gateway_fee, refund_amount, status</td>
+                </tr>
+                <tr>
+                  <td>FASTag Orders</td>
+                  <td>RDS → buy_fastag_payment</td>
+                  <td>order_id, created_at, amount, status (captured/refunded/failed)</td>
+                </tr>
+                <tr>
+                  <td>Bike Insurance</td>
+                  <td>DuckDB → policybazaar_bike_daily</td>
+                  <td>report_date, bike_sale_count, revenue</td>
+                </tr>
+                <tr>
+                  <td>Car Insurance</td>
+                  <td>DuckDB → policybazaar_car_daily</td>
+                  <td>report_date, car_sale_count, revenue</td>
+                </tr>
+                <tr>
+                  <td>CV Insurance</td>
+                  <td>DuckDB → policybazaar_cv_daily</td>
+                  <td>report_date, cv_sale_count, revenue</td>
+                </tr>
+                <tr>
+                  <td>Spend Breakdown</td>
+                  <td>Config / manual input</td>
+                  <td>ad_channel, amount, period (WhatsApp CRM, Google, Meta, etc.)</td>
+                </tr>
+                <tr>
+                  <td>User Metrics</td>
+                  <td>App DB / Analytics</td>
+                  <td>user_id, signup_date, last_active_date (for DAU/MAU/signups)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:10px;">
+              API Endpoints (already live or planned)
+            </div>
+            <table class="req-table">
+              <thead>
+                <tr>
+                  <th>Endpoint</th>
+                  <th>Status</th>
+                  <th>Returns</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>GET /api/v1/business-analytics/report</td>
+                  <td><span class="tag tag-green">Live</span></td>
+                  <td>service_revenue[], insurance_revenue[], totals — filtered by start_date &amp; end_date query params</td>
+                </tr>
+                <tr>
+                  <td>POST /api/v1/business-analytics/sync</td>
+                  <td><span class="tag tag-green">Live</span></td>
+                  <td>Trigger RDS → DuckDB refresh for all payment tables</td>
+                </tr>
+                <tr>
+                  <td>POST /api/v1/business-analytics/policybazaar-bike/daily</td>
+                  <td><span class="tag tag-green">Live</span></td>
+                  <td>Upsert Bike insurance daily rows</td>
+                </tr>
+                <tr>
+                  <td>POST /api/v1/business-analytics/policybazaar-car/daily</td>
+                  <td><span class="tag tag-green">Live</span></td>
+                  <td>Upsert Car insurance daily rows</td>
+                </tr>
+                <tr>
+                  <td>POST /api/v1/business-analytics/policybazaar-cv/daily</td>
+                  <td><span class="tag tag-green">Live</span></td>
+                  <td>Upsert CV insurance daily rows</td>
+                </tr>
+                <tr>
+                  <td>GET /api/v1/business-analytics/debug-duckdb</td>
+                  <td><span class="tag tag-green">Live</span></td>
+                  <td>Raw row counts and samples from all DuckDB tables</td>
+                </tr>
+                <tr>
+                  <td>GET /api/v1/business-analytics/user-metrics</td>
+                  <td><span class="tag tag-amber">Planned</span></td>
+                  <td>DAU, MAU, new signups — needs app DB integration</td>
+                </tr>
+                <tr>
+                  <td>GET /api/v1/business-analytics/spend</td>
+                  <td><span class="tag tag-amber">Planned</span></td>
+                  <td>Ad spend and operational cost breakdown per period</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <!-- Footer -->
+      <div class="footer">
+        VehicleInfo Business Analytics &middot; DuckDB warehouse + Policybazaar Gmail ingestion &middot; Refresh every 15 min
+      </div>
+
+    </div><!-- /stack -->
+  </main>
+</div>
+
+<script>
+  // ── Date range apply ──
+  function applyRange() {
+    const s = document.getElementById('startDate').value;
+    const e = document.getElementById('endDate').value;
+    if (!s || !e) return;
+    if (s > e) { alert('Start date must be before end date.'); return; }
+
+    document.getElementById('appliedLabel').textContent = `Applied range: ${s} to ${e}`;
+
+    // Fade metrics to simulate loading
+    const vals = document.querySelectorAll('.card-val, .svc-amount, .ins-rev, .ins-sales, .cac-val, .metric-val');
+    vals.forEach(el => { el.style.opacity = '0.35'; el.style.transition = 'opacity 0.18s'; });
+    setTimeout(() => vals.forEach(el => { el.style.opacity = '1'; }), 700);
+  }
+
+  // ── Enter key on date inputs ──
+  document.querySelectorAll('.dr-input').forEach(inp =>
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') applyRange(); })
+  );
+
+  // ── ⌘K / Ctrl+K to focus search ──
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      document.getElementById('searchInput').focus();
+    }
+    if (e.key === 'Escape') document.getElementById('searchInput').blur();
+  });
+
+  // ── Pause / Resume agent ──
+  let agentActive = true;
+  function toggleAgent() {
+    agentActive = !agentActive;
+    const badge = document.getElementById('agentBadge');
+    const btn   = document.getElementById('pauseBtn');
+    if (agentActive) {
+      badge.className = 'badge-active';
+      badge.innerHTML = '<span class="badge-dot"></span> Active';
+      btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg> Pause Agent`;
+    } else {
+      badge.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:20px;background:rgba(210,153,34,0.12);color:#d29922;';
+      badge.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span> Paused';
+      btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Resume Agent`;
+    }
+  }
+
+  // ── Live "last activity" counter ──
+  let seconds = 42;
+  setInterval(() => {
+    seconds++;
+    const el = document.getElementById('agentTime');
+    if (!el) return;
+    if (seconds < 60) el.textContent = seconds + 's';
+    else if (seconds < 3600) el.textContent = Math.floor(seconds/60) + 'm ' + (seconds%60) + 's';
+    else el.textContent = Math.floor(seconds/3600) + 'h ago';
+  }, 1000);
+</script>
+</body>
+</html>

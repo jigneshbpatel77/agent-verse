@@ -43,18 +43,48 @@ class FirebaseAnalyticsSummary(BaseModel):
     breakdowns: list[FirebaseAnalyticsBreakdown] = Field(default_factory=list)
 
 
-class FirebaseCrashlyticsReport(BaseModel):
+class FirebaseEventCatalogItem(BaseModel):
+    event_name: str
+    label: str
+    event_count: int
+    total_users: int
+
+
+class FirebaseEventCatalogResponse(BaseModel):
+    property_id: str
+    days: int
+    generated_at: datetime
+    events: list[FirebaseEventCatalogItem] = Field(default_factory=list)
+
+
+class FunnelDefinitionCreate(BaseModel):
     name: str
-    display_name: str | None = None
-    type: str | None = None
-    raw: dict[str, Any] = Field(default_factory=dict)
+    events: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class FunnelDefinitionItem(BaseModel):
+    id: str
+    name: str
+    events: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class FunnelDefinitionList(BaseModel):
+    funnels: list[FunnelDefinitionItem] = Field(default_factory=list)
+
+
+class FirebaseCrashlyticsRelease(BaseModel):
+    name: str
+    display_version: str | None = None
+    build_version: str | None = None
+    create_time: str | None = None
+    crashlytics_report: dict[str, Any] = Field(default_factory=dict)
 
 
 class FirebaseCrashlyticsReportsResponse(BaseModel):
     project_id: str
     app_id: str
     generated_at: datetime
-    reports: list[FirebaseCrashlyticsReport]
+    releases: list[FirebaseCrashlyticsRelease] = Field(default_factory=list)
 
 
 class FirebaseOverviewResponse(BaseModel):
